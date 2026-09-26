@@ -1,0 +1,881 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>The Astrolabe — a real-time engraved brass instrument</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg:      oklch(12% 0.014 62);
+    --surface: oklch(18% 0.016 66);
+    --fg:      oklch(95% 0.012 86);
+    --muted:   oklch(72% 0.016 80);
+    --border:  oklch(33% 0.016 70);
+    --accent:  oklch(80% 0.135 78);
+    --font-display: 'Iowan Old Style', 'Charter', 'Palatino Linotype', Georgia, serif;
+    --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    --font-mono: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden;
+    background: var(--bg); color: var(--fg);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+  }
+  #gl { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
+  #gl.grabbing { cursor: grabbing; }
+  #gl.over-ring { cursor: ew-resize; }
+  #gl.over-globe { cursor: ew-resize; }
+  .vignette {
+    position: fixed; inset: 0; z-index: 1; pointer-events: none;
+    background:
+      radial-gradient(130% 100% at 50% 40%, transparent 38%, oklch(8% 0.012 58 / 0.88) 100%),
+      linear-gradient(oklch(6% 0.01 55 / 0.5), transparent 30%);
+  }
+  .mast { position: fixed; top: clamp(20px, 4.2vh, 48px); left: clamp(20px, 4vw, 60px); z-index: 3; pointer-events: none; }
+  .kicker {
+    margin: 0 0 clamp(10px, 1.6vh, 18px);
+    font: 600 clamp(10px, 0.82vw, 12px)/1.4 var(--font-mono);
+    letter-spacing: 0.34em; text-transform: uppercase; color: var(--accent);
+  }
+  h1 {
+    margin: 0; font-family: var(--font-display); font-weight: 500;
+    font-size: clamp(34px, 4.6vw, 66px); line-height: 0.98;
+    letter-spacing: -0.012em; max-width: 15ch;
+    text-shadow: 0 2px 40px oklch(6% 0.01 55 / 0.7);
+  }
+  h1 span { color: var(--accent); }
+
+  .tools { position: fixed; top: clamp(20px, 4.2vh, 48px); right: clamp(20px, 4vw, 60px); z-index: 4;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; max-width: 46vw; }
+  .btn {
+    appearance: none; font: 600 clamp(10px, 0.8vw, 12px)/1 var(--font-mono);
+    letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--fg); background: oklch(20% 0.016 66 / 0.72);
+    border: 1px solid var(--border); border-radius: 999px;
+    padding: 11px 16px; min-height: 44px; cursor: pointer;
+    backdrop-filter: blur(8px);
+    transition: background 150ms cubic-bezier(0.2,0,0,1), border-color 150ms, color 150ms;
+  }
+  .btn:hover { background: oklch(27% 0.02 70 / 0.9); border-color: oklch(46% 0.02 72); }
+  .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .btn[aria-pressed="true"] { color: oklch(24% 0.03 70); background: var(--accent); border-color: var(--accent); }
+  .badge {
+    font: 600 clamp(10px, 0.78vw, 12px)/1 var(--font-mono); letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--muted);
+    border: 1px solid var(--border); border-radius: 999px;
+    padding: 12px 14px; min-height: 44px; display: inline-flex; align-items: center;
+    background: oklch(16% 0.014 64 / 0.6); backdrop-filter: blur(8px);
+  }
+
+  .foot { position: fixed; left: clamp(20px, 4vw, 60px); bottom: clamp(20px, 4.2vh, 46px); z-index: 3;
+    max-width: min(46ch, 46vw); pointer-events: none; }
+  .sub { margin: 0; font-size: clamp(14px, 1.08vw, 17px); line-height: 1.5; color: var(--fg); opacity: 0.9; }
+  .readout {
+    margin: 16px 0 0; font: 500 clamp(11px, 0.84vw, 13px)/1.4 var(--font-mono);
+    letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent);
+  }
+  .hint { margin: 8px 0 0; font: 400 clamp(11px, 0.84vw, 13px)/1.5 var(--font-mono); color: var(--muted); }
+  .attrib { position: fixed; right: clamp(20px, 4vw, 60px); bottom: clamp(20px, 4.2vh, 46px); z-index: 3;
+    margin: 0; max-width: 30ch; text-align: right; font: 400 clamp(10px, 0.76vw, 12px)/1.6 var(--font-mono);
+    color: var(--muted); pointer-events: none; }
+
+  .controls {
+    position: fixed; z-index: 4; right: clamp(20px, 4vw, 60px); top: 50%; transform: translateY(-50%);
+    width: min(266px, 32vw); display: grid; gap: 15px; padding: 18px 18px 16px;
+    background: oklch(16% 0.014 64 / 0.74); border: 1px solid var(--border); border-radius: 14px;
+    backdrop-filter: blur(10px);
+  }
+  .controls h2 {
+    margin: 0 0 2px; font: 600 clamp(10px, 0.78vw, 12px)/1 var(--font-mono);
+    letter-spacing: 0.24em; text-transform: uppercase; color: var(--accent);
+  }
+  .ctl { display: grid; gap: 6px; }
+  .ctl .top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+  .ctl .name { font: 500 clamp(11px, 0.82vw, 12px)/1.25 var(--font-mono); color: var(--fg); }
+  .ctl .val { font: 500 clamp(10px, 0.78vw, 12px)/1 var(--font-mono); color: var(--accent); font-variant-numeric: tabular-nums; }
+  .ctl input[type="range"] {
+    -webkit-appearance: none; appearance: none; width: 100%; height: 22px;
+    margin: 0; background: transparent; cursor: ew-resize;
+  }
+  .ctl input[type="range"]::-webkit-slider-runnable-track { height: 4px; border-radius: 999px; background: oklch(34% 0.02 70); }
+  .ctl input[type="range"]::-moz-range-track { height: 4px; border-radius: 999px; background: oklch(34% 0.02 70); }
+  .ctl input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none; width: 16px; height: 16px; margin-top: -6px;
+    border-radius: 50%; background: var(--accent); border: 2px solid oklch(17% 0.02 64);
+    box-shadow: 0 2px 8px oklch(0% 0 0 / 0.5);
+  }
+  .ctl input[type="range"]::-moz-range-thumb {
+    width: 14px; height: 14px; border-radius: 50%; background: var(--accent);
+    border: 2px solid oklch(17% 0.02 64);
+  }
+  .ctl input[type="range"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 6px; }
+
+  #fallback { position: fixed; inset: 0; z-index: 9; display: grid; place-items: center; padding: 8vw;
+    background: var(--bg); text-align: center; }
+  #fallback[hidden] { display: none; }
+  #fallback p { max-width: 46ch; font-size: 16px; line-height: 1.6; color: var(--muted); }
+
+  @media (max-width: 780px) {
+    .foot { max-width: none; right: clamp(20px, 4vw, 60px); bottom: clamp(300px, 44vh, 360px); }
+    .attrib { display: none; }
+    .tools { max-width: 60vw; }
+    .sub { font-size: 14px; }
+    .controls {
+      top: auto; bottom: 16px; left: 16px; right: 16px; width: auto; transform: none;
+      grid-auto-flow: column; grid-auto-columns: 1fr; gap: 12px; overflow-x: auto;
+    }
+    .controls h2 { display: none; }
+    .ctl .name { font-size: 10px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .btn { transition: none; } }
+</style>
+</head>
+<body>
+<canvas id="gl" aria-label="Interactive 3D model of an engraved brass astrolabe"></canvas>
+<div class="vignette" aria-hidden="true"></div>
+
+<header class="mast" data-od-id="masthead">
+  <p class="kicker" data-od-id="kicker">Astronomical instrument · cast brass</p>
+  <h1 data-od-id="title">The Astrolabe<span aria-hidden="true">.</span></h1>
+</header>
+
+<div class="tools" data-od-id="toolbar">
+  <button id="motion" class="btn" aria-pressed="true" data-od-id="auto-rotate-toggle">Auto-rotate</button>
+  <button id="reset" class="btn" data-od-id="reset-view">Reset</button>
+  <span class="badge" id="fps" data-od-id="fps-badge">GPU · boot</span>
+</div>
+
+<section class="controls" id="controls" aria-label="Ring controls" data-od-id="ring-controls">
+  <h2>Ring controls</h2>
+</section>
+
+<footer class="foot" data-od-id="notes">
+  <p class="sub" data-od-id="subtitle">A celestial globe at the centre of the plate, inside four engraved brass rings. One pole runs through them all and pins each ring in place — yet every ring still turns on its own.</p>
+  <p class="readout" id="readout" data-od-id="readout">resting · no ring engaged</p>
+  <p class="hint" data-od-id="hint">Drag a ring or the globe, or size it with its slider · auto-rotate opens them all · drag the dark to orbit · scroll to zoom · double-click to reset</p>
+</footer>
+
+<p class="attrib" data-od-id="attribution">Interpretation after the reference photograph · engraving generated procedurally in the browser</p>
+
+<div id="fallback" hidden data-od-id="fallback">
+  <p>Live 3D needs WebGL2. This browser or device does not expose it, so the astrolabe cannot be rendered.</p>
+</div>
+
+<script src="vendor/three.min.js" onerror="window.__threeMissing=true"></script>
+<script type="text/javascript">
+(function () {
+  'use strict';
+
+  var canvas = document.getElementById('gl');
+  var fallback = document.getElementById('fallback');
+  var fpsEl = document.getElementById('fps');
+
+  function fail(msg) {
+    fallback.hidden = false;
+    if (msg) fallback.querySelector('p').textContent = msg;
+    fpsEl.textContent = 'Offline';
+  }
+
+  var probeOK = false;
+  try { probeOK = !!document.createElement('canvas').getContext('webgl2'); } catch (e) { probeOK = false; }
+  if (!probeOK) { fail(null); return; }
+
+  function boot() { try { build(); } catch (err) { console.error(err); fail('The scene failed to initialise.'); } }
+  if (window.THREE) boot();
+  else {
+    var s = document.createElement('script');
+    s.src = 'https://unpkg.com/three@0.149.0/build/three.min.js';
+    s.onload = boot;
+    s.onerror = function () { fail('The rendering library could not be loaded.'); };
+    document.head.appendChild(s);
+  }
+
+function build() {
+  var TAU = Math.PI * 2;
+  var DEG = Math.PI / 180;
+
+  /* ---------- seed + canvas helpers ---------- */
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      var t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function newCanvas(w, h) { var c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+  function shade(hex, f) { var c = new THREE.Color(hex).multiplyScalar(f); return '#' + c.getHexString(); }
+
+  var G_MAP = 'rgba(36,22,6,0.95)', G_BUMP = 'rgba(58,58,58,0.97)';
+  var L_MAP = 'rgba(40,24,7,0.97)', L_BUMP = 'rgba(52,52,52,0.97)';
+
+  function pen(m, b) {
+    return {
+      stroke: function (pathFn, lw) {
+        [[m, G_MAP], [b, G_BUMP]].forEach(function (pair) {
+          var c = pair[0];
+          c.save(); c.beginPath(); pathFn(c);
+          c.lineWidth = lw; c.lineCap = 'round'; c.lineJoin = 'round';
+          c.strokeStyle = pair[1]; c.stroke(); c.restore();
+        });
+      },
+      text: function (txt, x, y, font, align) {
+        [[m, L_MAP], [b, L_BUMP]].forEach(function (pair) {
+          var c = pair[0];
+          c.save(); c.font = font; c.textAlign = align || 'center'; c.textBaseline = 'middle';
+          c.fillStyle = pair[1]; c.fillText(txt, x, y); c.restore();
+        });
+      }
+    };
+  }
+  function brassBase(m, w, h, seed) {
+    var g = m.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, '#7a5f28'); g.addColorStop(0.5, '#b08c46'); g.addColorStop(1, '#7a5f28');
+    m.fillStyle = g; m.fillRect(0, 0, w, h);
+    var rnd = mulberry32(seed || 7), i;
+    m.save();
+    var blotches = Math.min(2600, Math.round(w * h / 7000));
+    for (i = 0; i < blotches; i++) {
+      m.globalAlpha = 0.05;
+      m.fillStyle = rnd() < 0.5 ? '#6a4c1e' : '#ddc389';
+      m.beginPath(); m.arc(rnd() * w, rnd() * h, 1 + rnd() * 26, 0, TAU); m.fill();
+    }
+    for (i = 0; i < Math.round(w / 42); i++) {
+      m.globalAlpha = 0.05; m.fillStyle = '#3f8f7a';
+      m.beginPath(); m.arc(rnd() * w, rnd() * h, 2 + rnd() * 32, 0, TAU); m.fill();
+    }
+    m.restore(); m.globalAlpha = 1;
+  }
+  function kufic(p, x0, x1, yBase, size, rnd) {
+    p.stroke(function (c) {
+      c.moveTo(x0, yBase);
+      var x = x0, guard = 0;
+      while (x < x1 - size && guard++ < 4000) {
+        var kind = Math.floor(rnd() * 5);
+        var aw = size * (0.5 + rnd() * 0.5);
+        if (kind === 0) {
+          c.moveTo(x, yBase); c.lineTo(x, yBase - size);
+          c.moveTo(x - size * 0.26, yBase - size); c.lineTo(x + size * 0.3, yBase - size);
+        } else if (kind === 1) {
+          c.moveTo(x, yBase); c.lineTo(x, yBase - size * 0.82); c.lineTo(x + size * 0.62, yBase - size * 0.82);
+        } else if (kind === 2) {
+          c.moveTo(x, yBase); c.lineTo(x, yBase - size * 0.55); c.lineTo(x + size * 0.56, yBase);
+        } else if (kind === 3) {
+          c.moveTo(x, yBase); c.lineTo(x, yBase - size * 0.66);
+          c.moveTo(x, yBase); c.lineTo(x + size * 0.66, yBase);
+        } else {
+          c.moveTo(x, yBase); c.lineTo(x + size * 0.4, yBase);
+          c.moveTo(x + size * 0.4, yBase); c.lineTo(x + size * 0.4, yBase - size * 0.5);
+        }
+        var next = x + aw + size * 0.42;
+        c.moveTo(x + size * 0.05, yBase); c.lineTo(next, yBase);
+        if (rnd() < 0.32) { c.moveTo(x + aw * 0.6, yBase - size - 3); c.lineTo(x + aw * 0.6, yBase - size - 4.4); }
+        x = next;
+      }
+    }, Math.max(1.7, size * 0.13));
+  }
+  function makeTexture(cv, bump, srgb) {
+    var t = new THREE.CanvasTexture(cv);
+    t.wrapS = THREE.RepeatWrapping; t.wrapT = THREE.RepeatWrapping;
+    t.anisotropy = maxAniso;
+    if (srgb) t.encoding = THREE.sRGBEncoding;
+    var bt = new THREE.CanvasTexture(bump);
+    bt.wrapS = THREE.RepeatWrapping; bt.wrapT = THREE.RepeatWrapping;
+    bt.anisotropy = maxAniso;
+    return { map: t, bump: bt };
+  }
+
+  /* ---------- celestial globe engraving ---------- */
+  function makeSphereTexture() {
+    var W = 2560, H = 1280;
+    var mc = newCanvas(W, H), bc = newCanvas(W, H);
+    var m = mc.getContext('2d'), b = bc.getContext('2d');
+    brassBase(m, W, H, 21);
+    b.fillStyle = '#8a8a8a'; b.fillRect(0, 0, W, H);
+    var p = pen(m, b);
+    var latY = function (lat) { return (1 - (lat + 90) / 180) * H; };
+    var lonX = function (lon) { return (((lon % 360) + 360) % 360) / 360 * W; };
+    var lat, lon;
+
+    for (lat = -80; lat <= 80; lat += 10)
+      (function (y, w) { p.stroke(function (c) { c.moveTo(0, y); c.lineTo(W, y); }, w); })(latY(lat), lat % 30 === 0 ? 2.3 : 1.1);
+    for (lon = 0; lon < 360; lon += 10)
+      (function (x, w) { p.stroke(function (c) { c.moveTo(x, 0); c.lineTo(x, H); }, w); })(lonX(lon), lon % 30 === 0 ? 2.3 : 1.1);
+    [-23.44, 23.44].forEach(function (t) { var y = latY(t); p.stroke(function (c) { c.moveTo(0, y); c.lineTo(W, y); }, 3.2); });
+    [-66.56, 66.56].forEach(function (t) { var y = latY(t); p.stroke(function (c) { c.moveTo(0, y); c.lineTo(W, y); }, 2); });
+
+    var ey = latY(0);
+    p.stroke(function (c) { c.moveTo(0, ey - H * 0.03); c.lineTo(W, ey - H * 0.03); c.moveTo(0, ey + H * 0.03); c.lineTo(W, ey + H * 0.03); }, 2.4);
+    p.stroke(function (c) {
+      for (var d = 0; d < 360; d += 2) {
+        var x = lonX(d), long = d % 10 === 0;
+        c.moveTo(x, long ? ey - H * 0.021 : ey - H * 0.009); c.lineTo(x, ey + H * 0.009);
+      }
+    }, 2);
+    kufic(p, 0, W, ey + H * 0.027, H * 0.02, mulberry32(5));
+
+    var eps = 23.44 * DEG;
+    p.stroke(function (c) {
+      var prev = null;
+      for (var i = 0; i <= 720; i++) {
+        var lam = i / 720 * TAU;
+        var decl = Math.asin(Math.sin(eps) * Math.sin(lam)) / DEG;
+        var ra = Math.atan2(Math.cos(eps) * Math.sin(lam), Math.cos(lam)) / DEG;
+        if (ra < 0) ra += 360;
+        if (prev !== null && prev - ra > 180) ra += 360;
+        prev = ra;
+        var x = ((ra % 360) + 360) % 360 / 360 * W, y = latY(decl);
+        if (i === 0) c.moveTo(x, y); else c.lineTo(x, y);
+      }
+    }, 3.4);
+
+    kufic(p, 0, W, latY(44), H * 0.017, mulberry32(9));
+    kufic(p, 0, W, latY(-44), H * 0.017, mulberry32(11));
+
+    var rnd = mulberry32(1234);
+    var names = ['SIRIUS', 'VEGA', 'ALTAIR', 'RIGEL', 'ALDEBARAN', 'ARCTURUS', 'CAPELLA', 'PROCYON', 'DENEB', 'POLARIS'];
+    for (var s = 0; s < 170; s++) {
+      var slon = rnd() * 360, slat = Math.asin(rnd() * 2 - 1) / DEG;
+      var sx = lonX(slon), sy = latY(slat), r = 1.5 + rnd() * 3.6;
+      (function (x, y, rr) {
+        p.stroke(function (c) { c.moveTo(x - rr, y); c.lineTo(x + rr, y); c.moveTo(x, y - rr); c.lineTo(x, y + rr); }, 2.1);
+      })(sx, sy, r);
+    }
+    for (var n = 0; n < names.length; n++) {
+      var nlon = (n * 37 + 13) % 360, nlat = Math.sin(n * 1.7) * 62;
+      var nx = lonX(nlon), ny = latY(nlat);
+      (function (x, y) {
+        p.stroke(function (c) { c.moveTo(x - 6, y); c.lineTo(x + 6, y); c.moveTo(x, y - 6); c.lineTo(x, y + 6); }, 2.6);
+      })(nx, ny);
+      p.text(names[n], nx, ny - 15, '600 ' + Math.round(H * 0.016) + 'px Georgia, "Times New Roman", serif');
+    }
+    return makeTexture(mc, bc, true);
+  }
+
+  /* ---------- ring band engravings ---------- */
+  function ringTexture(spec) {
+    var W = 2560;
+    var H = Math.max(118, Math.round(W * spec.tube / spec.major));
+    var mc = newCanvas(W, H), bc = newCanvas(W, H);
+    var m = mc.getContext('2d'), b = bc.getContext('2d');
+    brassBase(m, W, H, spec.seed);
+    b.fillStyle = '#8a8a8a'; b.fillRect(0, 0, W, H);
+    var p = pen(m, b);
+    var cy = H / 2;
+    var zU = cy - 0.22 * H, zL = cy + 0.24 * H;
+    var tA = cy - 0.02 * H, tB = cy + 0.14 * H;
+
+    p.stroke(function (c) { c.moveTo(0, zU); c.lineTo(W, zU); c.moveTo(0, zL); c.lineTo(W, zL); }, 2);
+
+    function ticks(step, longEvery, baseline, shortY, longY, lw) {
+      var count = Math.round(360 / step);
+      p.stroke(function (c) {
+        for (var i = 0; i < count; i++) {
+          var x = i / count * W, long = i % longEvery === 0;
+          c.moveTo(x, long ? longY : shortY); c.lineTo(x, baseline);
+        }
+      }, lw);
+    }
+    function numbers(step, y, font) {
+      for (var d = 0; d < 360; d += step) p.text(String(d), d / 360 * W, y, font);
+    }
+
+    if (spec.kind === 'equinoctial') {
+      ticks(5, 6, tB, cy + 0.045 * H, tA, 2.2);
+      numbers(30, cy + 0.19 * H, '600 ' + Math.round(H * 0.15) + 'px Georgia, serif');
+      kufic(p, 0, W, cy - 0.055 * H, H * 0.15, mulberry32(31));
+    } else if (spec.kind === 'zodiacal') {
+      var signs = ['ARIES', 'TAURUS', 'GEMINI', 'CANCER', 'LEO', 'VIRGO', 'LIBRA', 'SCORPIO', 'SAGITTARIUS', 'CAPRICORN', 'AQUARIUS', 'PISCES'];
+      for (var k = 0; k < 12; k++) {
+        var bx = k / 12 * W;
+        p.stroke(function (c) { c.moveTo(bx, zU); c.lineTo(bx, tB); }, 2.4);
+      }
+      for (var g = 0; g < 12; g++) {
+        var cx = (g + 0.5) / 12 * W;
+        p.text(signs[g], cx, cy - 0.105 * H, '600 ' + Math.round(H * 0.135) + 'px Georgia, serif');
+      }
+      ticks(5, 6, tB, cy + 0.05 * H, cy + 0.005 * H, 1.9);
+      numbers(30, cy + 0.185 * H, '600 ' + Math.round(H * 0.12) + 'px Georgia, serif');
+    } else if (spec.kind === 'tropical') {
+      ticks(2, 5, tB, cy + 0.05 * H, tA, 1.9);
+      numbers(30, cy + 0.19 * H, '600 ' + Math.round(H * 0.13) + 'px Georgia, serif');
+      kufic(p, 0, W, cy - 0.06 * H, H * 0.13, mulberry32(47));
+    } else {
+      var months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+      var days = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+      var total = days.reduce(function (a, v) { return a + v; }, 0), acc = 0;
+      for (var mi = 0; mi < 12; mi++) {
+        var mx = acc / total * W, mw = days[mi] / total * W;
+        p.stroke(function (c) { c.moveTo(mx, zU); c.lineTo(mx, tB); }, 2.4);
+        p.text(months[mi], mx + mw / 2, cy - 0.105 * H, '600 ' + Math.round(H * 0.13) + 'px Georgia, serif');
+        (function (mx, mw, nd) {
+          p.stroke(function (c) {
+            for (var d = 1; d < nd; d++) {
+              var x = mx + d / nd * mw;
+              c.moveTo(x, d % 5 === 0 ? tA : cy + 0.055 * H); c.lineTo(x, tB);
+            }
+          }, 1.8);
+        })(mx, mw, days[mi]);
+        acc += days[mi];
+      }
+    }
+    var t = makeTexture(mc, bc, true);
+    t.map.offset.y = 0.5;
+    t.bump.offset.y = 0.5;
+    return t;
+  }
+
+  /* ---------- mater / horizon plate engraving ---------- */
+  var R_IN = 2.48, R_OUT = 3.37, V_A = 5 / 11, V_B = 9 / 11;
+  function makePlateTexture() {
+    var W = 3072, H = 768;
+    var mc = newCanvas(W, H), bc = newCanvas(W, H);
+    var m = mc.getContext('2d'), b = bc.getContext('2d');
+    brassBase(m, W, H, 5);
+    b.fillStyle = '#8a8a8a'; b.fillRect(0, 0, W, H);
+    var p = pen(m, b);
+    function py(radius) {
+      var v = V_A + (R_OUT - radius) / (R_OUT - R_IN) * (V_B - V_A);
+      return (1 - v) * H;
+    }
+    var yEdgeOut = py(R_OUT), yEdgeIn = py(R_IN);
+
+    p.stroke(function (c) { c.moveTo(0, yEdgeOut); c.lineTo(W, yEdgeOut); c.moveTo(0, yEdgeIn); c.lineTo(W, yEdgeIn); }, 3);
+
+    var yNum = py(3.28), yTkTop = py(3.20), yTkBot = py(3.03);
+    p.stroke(function (c) {
+      for (var d = 0; d < 360; d++) {
+        var x = d / 360 * W, long = d % 5 === 0;
+        c.moveTo(x, long ? py(3.24) : yTkTop); c.lineTo(x, yTkBot);
+      }
+    }, 1.8);
+    for (var d2 = 0; d2 < 360; d2 += 10) p.text(String(d2), d2 / 360 * W, yNum, '600 26px Georgia, serif');
+
+    kufic(p, 0, W, py(2.78), 42, mulberry32(77));
+
+    var names = ['ALNITAK', 'ALDEBARAN', 'CAPELLA', 'BETELGEUSE', 'SIRIUS', 'PROCYON', 'REGULUS', 'SPICA', 'ARCTURUS', 'VEGA', 'ALTAIR', 'DENEB'];
+    var slotW = W / names.length;
+    for (var i = 0; i < names.length; i++) {
+      var cx = (i + 0.5) * slotW;
+      p.text(names[i], cx, py(2.60), '500 24px Georgia, serif');
+      p.stroke(function (c) {
+        c.moveTo(cx - slotW * 0.36, py(2.55)); c.lineTo(cx - slotW * 0.30, py(2.55));
+        c.moveTo(cx + slotW * 0.30, py(2.55)); c.lineTo(cx + slotW * 0.36, py(2.55));
+      }, 2);
+    }
+
+    var yWallTop = (1 - 0.36) * H, yWallBot = (1 - 0.273) * H;
+    p.stroke(function (c) {
+      for (var x = -H; x < W + H; x += 22) {
+        c.moveTo(x, yWallTop); c.lineTo(x + (yWallBot - yWallTop), yWallBot);
+      }
+      c.moveTo(0, yWallTop); c.lineTo(W, yWallTop); c.moveTo(0, yWallBot); c.lineTo(W, yWallBot);
+    }, 2.2);
+
+    var yBotA = (1 - 0.1818) * H, yBotB = (1 - 0.0909) * H;
+    p.stroke(function (c) {
+      for (var r = 0; r < 3; r++) {
+        var yy = yBotA + (yBotB - yBotA) * (r / 3);
+        c.moveTo(0, yy); c.lineTo(W, yy);
+      }
+    }, 1.6);
+
+    var yInA = (1 - 0.909) * H, yInB = (1 - 0.818) * H;
+    p.stroke(function (c) { c.moveTo(0, (yInA + yInB) / 2); c.lineTo(W, (yInA + yInB) / 2); }, 1.8);
+
+    return makeTexture(mc, bc, true);
+  }
+
+  /* ---------- renderer / scene ---------- */
+  var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: false, powerPreference: 'high-performance' });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 0.98;
+  renderer.setClearColor(0x0c0a07, 1);
+  var maxAniso = renderer.capabilities.getMaxAnisotropy();
+
+  var scene = new THREE.Scene();
+  var camera = new THREE.PerspectiveCamera(40, 1, 0.1, 300);
+
+  function studioEnv() {
+    var W = 1024, H = 512;
+    var cv = newCanvas(W, H), ctx = cv.getContext('2d');
+    var g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, '#2a2620'); g.addColorStop(0.5, '#15120e'); g.addColorStop(1, '#080604');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    function blob(x, y, rx, ry, col) {
+      var rg = ctx.createRadialGradient(x, y, 0, x, y, Math.max(rx, ry));
+      rg.addColorStop(0, col); rg.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = rg; ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, TAU); ctx.fill();
+    }
+    blob(W * 0.22, H * 0.18, 260, 180, 'rgba(255,236,200,0.68)');
+    blob(W * 0.68, H * 0.30, 220, 150, 'rgba(190,214,255,0.42)');
+    blob(W * 0.50, H * 0.82, 420, 150, 'rgba(255,196,120,0.22)');
+    var tex = new THREE.CanvasTexture(cv);
+    tex.mapping = THREE.EquirectangularReflectionMapping;
+    tex.encoding = THREE.sRGBEncoding;
+    var pmrem = new THREE.PMREMGenerator(renderer);
+    pmrem.compileEquirectangularShader();
+    var env = pmrem.fromEquirectangular(tex).texture;
+    tex.dispose(); pmrem.dispose();
+    return env;
+  }
+  scene.environment = studioEnv();
+
+  scene.add(new THREE.HemisphereLight(0xbfd2ff, 0x140f08, 0.3));
+  var key = new THREE.DirectionalLight(0xfff0d6, 1.5); key.position.set(5, 7.5, 6); scene.add(key);
+  var rim = new THREE.DirectionalLight(0x9fc0ff, 0.6); rim.position.set(-7, 1.5, -5); scene.add(rim);
+  var under = new THREE.DirectionalLight(0xffb56b, 0.32); under.position.set(-1, -6, 3); scene.add(under);
+
+  (function starfield() {
+    var N = 1400, pos = new Float32Array(N * 3), rnd = mulberry32(88);
+    for (var i = 0; i < N; i++) {
+      var u = rnd() * 2 - 1, th = rnd() * TAU, r = 90, s = Math.sqrt(1 - u * u);
+      pos[i * 3] = r * s * Math.cos(th); pos[i * 3 + 1] = r * u; pos[i * 3 + 2] = r * s * Math.sin(th);
+    }
+    var g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    var mat = new THREE.PointsMaterial({ color: 0xffe9c4, size: 1.3, sizeAttenuation: false, transparent: true, opacity: 0.55, depthWrite: false });
+    scene.add(new THREE.Points(g, mat));
+  })();
+
+  /* ---------- materials ---------- */
+  var brassMats = [];
+  function brassMaterial(tex, opts) {
+    opts = opts || {};
+    var mm = new THREE.MeshStandardMaterial({
+      color: tex ? 0xffffff : (opts.color || 0xb08a48),
+      metalness: 1.0,
+      roughness: opts.roughness !== undefined ? opts.roughness : 0.44,
+      envMapIntensity: opts.env !== undefined ? opts.env : 0.98
+    });
+    if (tex) { mm.map = tex.map; mm.bumpMap = tex.bump; mm.bumpScale = opts.bump !== undefined ? opts.bump : 0.06; }
+    mm.emissive = new THREE.Color(0x6a4715);
+    mm.emissiveIntensity = 0;
+    brassMats.push(mm);
+    return mm;
+  }
+
+  /* ---------- armillary ---------- */
+  var astro = new THREE.Group();
+  astro.rotation.x = -Math.PI / 2;
+  scene.add(astro);
+
+  var POLE = new THREE.Vector3(1, 0, 0);
+  var celestial = new THREE.Group();
+  astro.add(celestial);
+
+  var pickables = [], rings = [];
+  var RING_SPECS = [
+    { name: 'Equinoctial ring', kind: 'equinoctial', major: 1.22, tube: 0.085, seed: 3 },
+    { name: 'Zodiacal ring', kind: 'zodiacal', major: 1.58, tube: 0.085, seed: 6 },
+    { name: 'Tropical ring', kind: 'tropical', major: 1.94, tube: 0.090, seed: 9 },
+    { name: 'Calendar band', kind: 'calendar', major: 2.32, tube: 0.130, seed: 12 }
+  ];
+  var globe;
+
+  (function buildGlobe() {
+    var geo = new THREE.SphereGeometry(1.02, 96, 64);
+    geo.rotateZ(Math.PI / 2);
+    globe = new THREE.Mesh(geo, brassMaterial(makeSphereTexture(), { roughness: 0.40, bump: 0.05 }));
+    globe.userData = { kind: 'globe', name: 'Celestial globe' };
+    celestial.add(globe);
+    pickables.push(globe);
+  })();
+
+  RING_SPECS.forEach(function (spec, idx) {
+    var geo = new THREE.TorusGeometry(spec.major, spec.tube, 24, 288);
+    var mesh = new THREE.Mesh(geo, brassMaterial(ringTexture(spec), { roughness: 0.40, bump: 0.06 }));
+    mesh.userData = { kind: 'ring', name: spec.name, index: idx, init: 0 };
+    celestial.add(mesh);
+    rings.push(mesh);
+    pickables.push(mesh);
+  });
+
+  /* ---------- ring control sliders ---------- */
+  var controlsEl = document.getElementById('controls');
+  var knobs = [];
+  function knobDeg(rad) { return (((rad / DEG) % 360) + 360) % 360; }
+  function syncKnob(k) {
+    var d = Math.round(knobDeg(k.obj.rotation.x)) % 360;
+    k.input.value = String(d);
+    k.out.textContent = d + '°';
+  }
+  function makeKnob(obj, label, speed) {
+    var row = document.createElement('div');
+    row.className = 'ctl';
+    var top = document.createElement('div');
+    top.className = 'top';
+    var name = document.createElement('span');
+    name.className = 'name';
+    name.textContent = label;
+    var out = document.createElement('output');
+    out.className = 'val';
+    out.textContent = '0°';
+    top.appendChild(name); top.appendChild(out);
+    var input = document.createElement('input');
+    input.type = 'range'; input.min = '0'; input.max = '360'; input.step = '1'; input.value = '0';
+    input.setAttribute('aria-label', label + ' angle');
+    row.appendChild(top); row.appendChild(input);
+    controlsEl.appendChild(row);
+    var k = { obj: obj, input: input, out: out, speed: speed };
+    input.addEventListener('input', function () {
+      setAuto(false);
+      k.obj.rotation.x = parseFloat(input.value) * DEG;
+      k.out.textContent = Math.round(parseFloat(input.value)) + '°';
+    });
+    knobs.push(k);
+  }
+  RING_SPECS.forEach(function (spec, idx) {
+    makeKnob(rings[idx], spec.name, (idx % 2 === 0 ? 1 : -1) * (0.34 - idx * 0.045));
+  });
+  if (globe) makeKnob(globe, 'Celestial globe', 0.24);
+
+  (function buildPlate() {
+    var pts = [
+      new THREE.Vector2(R_IN, -0.05), new THREE.Vector2(3.10, -0.05), new THREE.Vector2(3.37, -0.05),
+      new THREE.Vector2(3.42, -0.02), new THREE.Vector2(3.42, 0.02), new THREE.Vector2(3.37, 0.05),
+      new THREE.Vector2(3.15, 0.05), new THREE.Vector2(2.93, 0.05), new THREE.Vector2(2.71, 0.05),
+      new THREE.Vector2(R_IN, 0.05), new THREE.Vector2(R_IN, -0.02), new THREE.Vector2(R_IN, -0.05)
+    ];
+    var geo = new THREE.LatheGeometry(pts, 320);
+    geo.rotateX(Math.PI / 2);
+    var mesh = new THREE.Mesh(geo, brassMaterial(makePlateTexture(), { roughness: 0.46, bump: 0.062 }));
+    mesh.position.z = -0.16;
+    astro.add(mesh);
+  })();
+
+  (function buildAxis() {
+    var mat = brassMaterial(null, { roughness: 0.30, env: 1.15 });
+    var g = new THREE.Group();
+    var RE = 3.62;
+    var bar = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, RE * 2, 22), mat);
+    bar.rotation.z = Math.PI / 2;
+    bar.userData = { kind: 'axis', name: 'Pole' };
+    g.add(bar);
+    [1, -1].forEach(function (sgn) {
+      var fin = new THREE.Mesh(new THREE.CylinderGeometry(0.105, 0.105, 0.34, 20), mat);
+      fin.rotation.z = Math.PI / 2; fin.position.x = sgn * (RE - 0.01); g.add(fin);
+      var cap = new THREE.Mesh(new THREE.SphereGeometry(0.105, 20, 16), mat);
+      cap.position.x = sgn * (RE + 0.16); g.add(cap);
+      var mount = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.26, 0.26), mat);
+      mount.position.x = sgn * 1.0; g.add(mount);
+      RING_SPECS.forEach(function (spec) {
+        var col = new THREE.Mesh(new THREE.CylinderGeometry(0.088, 0.088, 0.11, 16), mat);
+        col.rotation.z = Math.PI / 2; col.position.x = sgn * spec.major; g.add(col);
+      });
+    });
+    astro.add(g);
+  })();
+
+  (function buildDragon() {
+    var mat = brassMaterial(null, { roughness: 0.34, env: 1.1 });
+    var g = new THREE.Group();
+    g.position.z = 0.30;
+    var pts = [
+      new THREE.Vector3(-3.30, 0.34, 0), new THREE.Vector3(-3.86, 0.78, 0.02),
+      new THREE.Vector3(-4.44, 0.48, 0.02), new THREE.Vector3(-4.74, -0.04, 0),
+      new THREE.Vector3(-4.42, -0.54, 0), new THREE.Vector3(-5.00, -0.72, 0),
+      new THREE.Vector3(-5.46, -0.28, 0)
+    ];
+    var curve = new THREE.CatmullRomCurve3(pts);
+    g.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 180, 0.105, 16, false), mat));
+
+    var head = new THREE.Mesh(new THREE.SphereGeometry(0.21, 28, 20), mat);
+    head.scale.set(1.45, 0.86, 0.86);
+    head.position.copy(pts[6]); head.position.x -= 0.05; head.position.y += 0.06;
+    g.add(head);
+
+    var jaw = new THREE.Mesh(new THREE.ConeGeometry(0.10, 0.34, 20), mat);
+    jaw.rotation.z = -Math.PI * 0.62; jaw.position.set(-5.72, -0.16, 0); g.add(jaw);
+    var hornA = new THREE.Mesh(new THREE.ConeGeometry(0.055, 0.38, 16), mat);
+    hornA.rotation.z = Math.PI * 0.72; hornA.position.set(-5.56, 0.14, 0); g.add(hornA);
+    var hornB = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.30, 16), mat);
+    hornB.rotation.z = Math.PI * 0.48; hornB.position.set(-5.34, 0.02, 0.07); g.add(hornB);
+    var brow = new THREE.Mesh(new THREE.SphereGeometry(0.05, 14, 10), new THREE.MeshStandardMaterial({ color: 0x201408, metalness: 0.6, roughness: 0.5 }));
+    brow.position.set(-5.44, 0.02, 0.16); g.add(brow);
+
+    var mount = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.30, 0.66), mat);
+    mount.position.set(-3.24, 0.30, -0.26); mount.rotation.z = 0.2; g.add(mount);
+    astro.add(g);
+  })();
+
+  /* ---------- camera control ---------- */
+  var HOME = { theta: 0.55, phi: 0.68, radius: 12.6 };
+  var cam = { theta: HOME.theta, phi: HOME.phi, radius: HOME.radius };
+  function fitRadius() {
+    return window.innerWidth / window.innerHeight < 1 ? HOME.radius * 1.32 : HOME.radius;
+  }
+  function applyCamera() {
+    var sp = Math.sin(cam.phi), cp = Math.cos(cam.phi);
+    camera.position.set(cam.radius * sp * Math.sin(cam.theta), cam.radius * cp, cam.radius * sp * Math.cos(cam.theta));
+    camera.lookAt(0, 0, 0);
+  }
+  cam.radius = fitRadius();
+  applyCamera();
+
+  var motionOn = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var motionBtn = document.getElementById('motion');
+  function setAuto(on) {
+    motionOn = on;
+    motionBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  }
+  setAuto(motionOn);
+  motionBtn.addEventListener('click', function () { setAuto(!motionOn); });
+  document.getElementById('reset').addEventListener('click', resetView);
+  function resetView() {
+    cam.theta = HOME.theta; cam.phi = HOME.phi; cam.radius = fitRadius(); applyCamera();
+    rings.forEach(function (r) { r.rotation.x = r.userData.init || 0; });
+    if (globe) globe.rotation.x = 0;
+    knobs.forEach(syncKnob);
+  }
+
+  var raycaster = new THREE.Raycaster();
+  var pointer = new THREE.Vector2();
+  var dragPlane = new THREE.Plane(POLE.clone().applyQuaternion(astro.quaternion).normalize(), 0);
+  var hitPoint = new THREE.Vector3();
+  var state = { drag: null, hover: null, orbit: null, px: 0, py: 0 };
+  var readout = document.getElementById('readout');
+
+  function toPointer(ev) {
+    pointer.x = (ev.clientX / window.innerWidth) * 2 - 1;
+    pointer.y = -(ev.clientY / window.innerHeight) * 2 + 1;
+  }
+  function pick(ev) {
+    toPointer(ev);
+    raycaster.setFromCamera(pointer, camera);
+    var hits = raycaster.intersectObjects(pickables, false);
+    return hits.length ? hits[0].object : null;
+  }
+  function planeAngle(ev) {
+    toPointer(ev);
+    raycaster.setFromCamera(pointer, camera);
+    if (!raycaster.ray.intersectPlane(dragPlane, hitPoint)) return null;
+    if (hitPoint.lengthSq() > 3600) return null;
+    astro.worldToLocal(hitPoint);
+    return Math.atan2(hitPoint.z, hitPoint.y);
+  }
+  function setHover(obj) {
+    if (state.hover === obj) return;
+    state.hover = obj;
+    canvas.classList.toggle('over-ring', !!obj && obj.userData.kind === 'ring');
+    canvas.classList.toggle('over-globe', !!obj && obj.userData.kind === 'globe');
+    if (!obj) readout.textContent = 'resting · no ring engaged';
+  }
+  function deg(a) { return (((a / DEG) % 360) + 360) % 360; }
+
+  canvas.addEventListener('pointerdown', function (ev) {
+    canvas.setPointerCapture(ev.pointerId);
+    var obj = pick(ev);
+    state.px = ev.clientX; state.py = ev.clientY;
+    canvas.classList.add('grabbing');
+    if (obj) {
+      setAuto(false);
+      state.drag = { obj: obj, lastAngle: planeAngle(ev) };
+      setHover(obj);
+    } else {
+      state.orbit = { theta: cam.theta, phi: cam.phi };
+    }
+  });
+
+  canvas.addEventListener('pointermove', function (ev) {
+    if (state.drag) {
+      var a = planeAngle(ev);
+      if (a !== null && state.drag.lastAngle !== null) {
+        var d = a - state.drag.lastAngle;
+        if (d > Math.PI) d -= TAU; else if (d < -Math.PI) d += TAU;
+        state.drag.obj.rotation.x += d;
+        state.drag.lastAngle = a;
+        for (var qi = 0; qi < knobs.length; qi++) if (knobs[qi].obj === state.drag.obj) syncKnob(knobs[qi]);
+      }
+      return;
+    }
+    if (state.orbit) {
+      cam.theta = state.orbit.theta - (ev.clientX - state.px) * 0.0062;
+      cam.phi = Math.min(1.52, Math.max(0.30, state.orbit.phi - (ev.clientY - state.py) * 0.0062));
+      applyCamera();
+      return;
+    }
+    setHover(pick(ev));
+  });
+
+  function endDrag(ev) {
+    if (canvas.hasPointerCapture && canvas.hasPointerCapture(ev.pointerId)) canvas.releasePointerCapture(ev.pointerId);
+    state.drag = null; state.orbit = null;
+    canvas.classList.remove('grabbing');
+  }
+  canvas.addEventListener('pointerup', endDrag);
+  canvas.addEventListener('pointercancel', endDrag);
+  canvas.addEventListener('pointerleave', function () { if (!state.drag && !state.orbit) setHover(null); });
+  canvas.addEventListener('dblclick', resetView);
+  canvas.addEventListener('wheel', function (ev) {
+    ev.preventDefault();
+    cam.radius = Math.min(18, Math.max(7.6, cam.radius * Math.exp(ev.deltaY * 0.0011)));
+    applyCamera();
+  }, { passive: false });
+
+  /* ---------- resize ---------- */
+  function resize() {
+    var w = window.innerWidth, h = window.innerHeight;
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    if (canvas.width !== Math.floor(w * dpr) || canvas.height !== Math.floor(h * dpr)) {
+      renderer.setPixelRatio(dpr);
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    }
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  /* ---------- loop ---------- */
+  var frames = 0, last = performance.now(), acc = 0, prev = performance.now(), checked = false;
+  var clock = new THREE.Clock();
+
+  function tick(now) {
+    requestAnimationFrame(tick);
+    resize();
+    var dt = Math.min(clock.getDelta(), 0.05);
+
+    if (motionOn && !state.drag && !state.orbit) {
+      cam.theta += 0.12 * dt;
+      applyCamera();
+      for (var ri = 0; ri < knobs.length; ri++) {
+        knobs[ri].obj.rotation.x += knobs[ri].speed * dt;
+        syncKnob(knobs[ri]);
+      }
+    }
+
+    for (var i = 0; i < brassMats.length; i++) brassMats[i].emissiveIntensity = 0;
+    if (state.hover) state.hover.material.emissiveIntensity = 0.22;
+
+    if (state.hover) {
+      var o = state.hover;
+      readout.textContent = o.userData.name + ' · ' + deg(o.rotation.x).toFixed(0) + '°';
+    }
+
+    renderer.render(scene, camera);
+
+    if (!checked) {
+      checked = true;
+      var gl = renderer.getContext();
+      var err = gl.getError();
+      if (err !== 0) console.warn('WebGL error after first frame:', err);
+    }
+
+    frames++; acc += now - last; last = now;
+    if (acc > 500) {
+      fpsEl.textContent = 'GPU · ' + Math.round(frames * 1000 / acc) + ' fps';
+      frames = 0; acc = 0;
+    }
+  }
+  requestAnimationFrame(tick);
+}
+})();
+</script>
+</body>
+</html>

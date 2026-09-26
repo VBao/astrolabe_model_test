@@ -1,0 +1,908 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="dark light" />
+<title>Astrolabe Model Test: four AI models, one brief</title>
+<meta name="description" content="One brief given to four AI models: model this Islamic astrolabe. Compare the interactive WebGL results and read the run stats." />
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+<style>
+  @font-face { font-family: 'Cormorant Garamond'; src: url('assets/fonts/CormorantGaramond-500-latin.woff2') format('woff2'); font-weight: 500 600; font-style: normal; font-display: swap; }
+  @font-face { font-family: 'Amiri'; src: url('assets/fonts/Amiri-400-arabic.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+  @font-face { font-family: 'Amiri'; src: url('assets/fonts/Amiri-700-arabic.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
+  @font-face { font-family: 'IBM Plex Mono'; src: url('assets/fonts/IBMPlexMono-400-latin.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+  @font-face { font-family: 'IBM Plex Sans'; src: url('assets/fonts/IBMPlexSans-400-latin.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+
+  /* ---------- tokens ---------- */
+  :root {
+    color-scheme: dark;
+    --bg: #080b12;
+    --bg-soft: #0b0f18;
+    --card-a: #151b29;
+    --card-b: #0b0f18;
+    --stage: #05070c;
+    --ink: #f2ead9;
+    --muted: #a59d8b;
+    --faint: #948b78;
+    --gold: #c9a35c;
+    --gold-2: #e8c98a;
+    --on-accent: #17120a;
+    --ok: #7fd6c4;
+    --ok-line: rgba(127, 214, 196, .36);
+    --warn: #e7b96a;
+    --warn-line: rgba(231, 185, 106, .4);
+    --line: rgba(201, 163, 92, .2);
+    --line-2: rgba(201, 163, 92, .48);
+    --tint: rgba(201, 163, 92, .06);
+    --btn: rgba(255, 255, 255, .03);
+    --glow-1: rgba(201, 163, 92, .09);
+    --glow-2: rgba(127, 214, 196, .05);
+    --shadow: rgba(0, 0, 0, .5);
+    --serif: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+    --sans: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+    --mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+    --arabic: 'Amiri', serif;
+    --page: 1280px;
+    --gap: clamp(2.4rem, 4.5vw, 3.6rem);
+  }
+
+  @media (prefers-color-scheme: light) {
+    :root {
+      color-scheme: light;
+      --bg: #f2f3ef;
+      --bg-soft: #fafaf7;
+      --card-a: #fdfdfb;
+      --card-b: #f7f7f2;
+      --ink: #1a1d23;
+      --muted: #565b64;
+      --faint: #63676f;
+      --gold: #7d5a1e;
+      --gold-2: #5d4314;
+      --on-accent: #fbfaf5;
+      --ok: #1e7c66;
+      --ok-line: rgba(30, 124, 102, .4);
+      --warn: #8a5a12;
+      --warn-line: rgba(138, 90, 18, .45);
+      --line: rgba(26, 29, 35, .14);
+      --line-2: rgba(125, 90, 30, .45);
+      --tint: rgba(125, 90, 30, .05);
+      --btn: rgba(26, 29, 35, .03);
+      --glow-1: rgba(125, 90, 30, .07);
+      --glow-2: rgba(30, 124, 102, .04);
+      --shadow: rgba(26, 24, 16, .14);
+    }
+  }
+
+  /* ---------- base ---------- */
+  * { box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.55;
+    background:
+      radial-gradient(1100px 620px at 80% -12%, var(--glow-1), transparent 62%),
+      radial-gradient(900px 520px at 6% 110%, var(--glow-2), transparent 60%),
+      var(--bg);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection { background: var(--gold); color: var(--on-accent); }
+  a { color: var(--gold); }
+
+  [hidden] { display: none !important; }
+
+  .page { position: relative; z-index: 1; }
+
+  /* ---------- star field ---------- */
+  #stars { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+  #stars i { position: absolute; border-radius: 50%; background: #fdf6e3; }
+
+  @media (prefers-color-scheme: light) {
+    #stars { display: none; }
+  }
+
+  /* ---------- entrance ---------- */
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: none; }
+  }
+  .hero-copy > :nth-child(1) { animation: rise .7s cubic-bezier(.16, 1, .3, 1) .05s backwards; }
+  .hero-copy > :nth-child(2) { animation: rise .7s cubic-bezier(.16, 1, .3, 1) .12s backwards; }
+  .hero-copy > :nth-child(3) { animation: rise .7s cubic-bezier(.16, 1, .3, 1) .19s backwards; }
+  .hero-copy > :nth-child(4) { animation: rise .7s cubic-bezier(.16, 1, .3, 1) .26s backwards; }
+  .rosette       { animation: rise .9s cubic-bezier(.16, 1, .3, 1) .1s backwards; }
+  .card:nth-child(1) { animation: rise .7s cubic-bezier(.16, 1, .3, 1) .24s backwards; }
+  .card:nth-child(2) { animation: rise .7s cubic-bezier(.16, 1, .3, 1) .32s backwards; }
+  .card:nth-child(3) { animation: rise .7s cubic-bezier(.16, 1, .3, 1) .40s backwards; }
+  .card:nth-child(4) { animation: rise .7s cubic-bezier(.16, 1, .3, 1) .48s backwards; }
+
+  /* ---------- hero ---------- */
+  .hero {
+    max-width: var(--page);
+    margin: 0 auto;
+    padding: clamp(2.25rem, 5vw, 4rem) 1.5rem .75rem;
+    display: grid;
+    grid-template-columns: minmax(0, 1.45fr) minmax(0, .55fr);
+    gap: 2.5rem;
+    align-items: center;
+  }
+  .hero-copy { min-width: 0; }
+  h1 {
+    margin: 0;
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: clamp(2.8rem, 6.4vw, 4.8rem);
+    line-height: 1;
+    letter-spacing: .005em;
+    text-wrap: balance;
+  }
+  h1 .dot { color: var(--gold); }
+  .arabic {
+    margin: .8rem 0 0;
+    font-family: var(--arabic);
+    font-weight: 400;
+    font-size: clamp(1.5rem, 2.6vw, 2.1rem);
+    line-height: 1.4;
+    color: var(--gold-2);
+    text-align: left;
+    opacity: .9;
+  }
+  .lede {
+    max-width: 52ch;
+    margin: 1.1rem 0 0;
+    color: var(--muted);
+    font-size: 1.1rem;
+    text-wrap: pretty;
+  }
+  .lede em { color: var(--ink); font-style: italic; }
+  .hint { margin: 1.15rem 0 0; font-family: var(--mono); font-size: .8rem; color: var(--faint); }
+  kbd {
+    font-family: var(--mono);
+    font-size: .76rem;
+    color: var(--gold-2);
+    border: 1px solid var(--line);
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: .08em .38em;
+    background: var(--btn);
+  }
+
+  .rosette { justify-self: center; width: clamp(190px, 24vw, 320px); color: var(--gold); }
+  .rosette svg { width: 100%; height: auto; display: block; }
+  .rosette .spin { animation: spin 200s linear infinite; transform-origin: 50% 50%; }
+  .rosette .spin-rev { animation: spin 120s linear infinite reverse; transform-origin: 50% 50%; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ---------- notice ---------- */
+  .notice {
+    max-width: min(1232px, calc(100% - 3rem));
+    margin: 1.1rem auto 0;
+    padding: .85rem 1rem;
+    border: 1px solid var(--line-2);
+    border-left-width: 3px;
+    border-radius: 10px;
+    background: var(--tint);
+    font-family: var(--mono);
+    font-size: .84rem;
+    line-height: 1.65;
+    color: var(--gold-2);
+  }
+  .notice code { font-family: var(--mono); color: var(--ink); background: var(--btn); border-radius: 4px; padding: .05em .3em; }
+
+  /* ---------- cards ---------- */
+  main { max-width: var(--page); margin: 0 auto; padding: 0 1.5rem 3.5rem; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1.1rem;
+    margin-top: var(--gap);
+  }
+  @media (max-width: 1120px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 620px)  { .grid { grid-template-columns: 1fr; } }
+
+  .card {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: linear-gradient(170deg, var(--card-a), var(--card-b));
+    color: inherit;
+    text-decoration: none;
+    transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;
+  }
+  .card:hover { transform: translateY(-3px); border-color: var(--line-2); box-shadow: 0 18px 40px -24px var(--shadow); }
+  .card:active { transform: translateY(-1px); }
+  .card:focus-visible { outline: 2px solid var(--gold-2); outline-offset: 3px; }
+  .card[aria-current="true"] { border-color: var(--gold); box-shadow: inset 0 0 0 1px var(--gold); }
+
+  .thumb { margin: 0; aspect-ratio: 16 / 10; overflow: hidden; border-bottom: 1px solid var(--line); background: var(--stage); }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .35s ease; }
+  .card:hover .thumb img { transform: scale(1.03); }
+
+  .card-body { display: flex; flex-direction: column; gap: .6rem; padding: 1rem 1.05rem 1.15rem; flex: 1; }
+  .card-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: .4rem .6rem; }
+  .card-head h2 {
+    margin: 0;
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: 1.5rem;
+    line-height: 1.1;
+    letter-spacing: .005em;
+    text-wrap: balance;
+  }
+  .card-head .tag { margin-left: auto; }
+  .tag {
+    font-family: var(--mono);
+    font-size: .62rem;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    color: var(--ok);
+    border: 1px solid var(--ok-line);
+    border-radius: 999px;
+    padding: .2em .55em;
+    white-space: nowrap;
+  }
+  .tag.warn { color: var(--warn); border-color: var(--warn-line); }
+  .desc { margin: 0; color: var(--muted); font-size: .95rem; }
+
+  .notes {
+    margin: .1rem 0 0;
+    padding: .6rem .7rem;
+    border-left: 2px solid var(--gold);
+    border-radius: 0 8px 8px 0;
+    background: var(--tint);
+  }
+  .notes-label {
+    margin: 0 0 .3rem;
+    font-family: var(--mono);
+    font-size: .64rem;
+    letter-spacing: .15em;
+    text-transform: uppercase;
+    color: var(--gold-2);
+  }
+  .notes p { margin: 0; color: var(--muted); font-size: .87rem; line-height: 1.55; }
+  .notes strong { color: var(--ink); font-weight: 600; }
+
+  .card-stats { display: flex; flex-wrap: wrap; gap: .45rem 1.35rem; margin: .15rem 0 0; }
+  .card-stats > div { display: flex; flex-direction: column; gap: .05rem; }
+  .card-stats dt {
+    font-family: var(--mono);
+    font-size: .62rem;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+  .card-stats dd { margin: 0; font-family: var(--mono); font-size: .9rem; color: var(--ink); font-variant-numeric: tabular-nums; }
+
+  .meta { margin: auto 0 0; padding-top: .6rem; font-family: var(--mono); font-size: .72rem; color: var(--faint); }
+  .view-cta { margin-top: .1rem; font-family: var(--mono); font-size: .78rem; letter-spacing: .05em; color: var(--gold-2); }
+  .card[aria-current="true"] .view-cta { color: var(--gold); }
+
+  /* ---------- viewer ---------- */
+  .viewer {
+    margin-top: var(--gap);
+    border: 1px solid var(--line-2);
+    border-radius: 16px;
+    overflow: hidden;
+    background: var(--bg-soft);
+    box-shadow: 0 32px 64px -44px var(--shadow);
+  }
+  .viewer-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: .6rem 1rem;
+    padding: .7rem .85rem;
+    border-bottom: 1px solid var(--line);
+  }
+  .viewer-id { display: flex; align-items: baseline; gap: .65rem; min-width: 0; }
+  .viewer-name { font-family: var(--serif); font-weight: 600; font-size: 1.3rem; white-space: nowrap; }
+  .viewer-file { font-family: var(--mono); font-size: .72rem; color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .viewer-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; }
+
+  .btn {
+    font-family: var(--mono);
+    font-size: .78rem;
+    color: var(--ink);
+    background: var(--btn);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: .42rem .85rem;
+    cursor: pointer;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: border-color .15s ease, color .15s ease, background .15s ease;
+  }
+  .btn:hover { border-color: var(--gold); color: var(--gold-2); }
+  .btn:active { transform: translateY(1px); }
+  .btn.primary { background: var(--gold); border-color: var(--gold); color: var(--on-accent); }
+  .btn.primary:hover { background: var(--gold-2); border-color: var(--gold-2); color: var(--on-accent); }
+  .btn:focus-visible { outline: 2px solid var(--gold-2); outline-offset: 2px; }
+
+  .frame-wrap { position: relative; height: clamp(440px, 76vh, 860px); background: var(--stage); }
+  .frame-wrap iframe { width: 100%; height: 100%; border: 0; display: block; background: var(--stage); }
+  .frame-wrap:fullscreen { height: 100vh; }
+  .frame-wrap:fullscreen iframe { height: 100vh; }
+
+  .loading {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1.05rem;
+    background: var(--stage);
+    font-family: var(--mono);
+    font-size: .78rem;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: #e8c98a;
+    transition: opacity .35s ease;
+  }
+  .loading.hidden { opacity: 0; pointer-events: none; }
+  .dial {
+    position: relative;
+    width: 54px;
+    height: 54px;
+    border-radius: 50%;
+    border: 1px solid rgba(201, 163, 92, .35);
+    animation: spin 3.2s linear infinite;
+  }
+  .dial::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: 50%;
+    width: 1px;
+    height: 22px;
+    background: linear-gradient(to top, rgba(232, 201, 138, 0), #e8c98a);
+  }
+  .dial::after {
+    content: "";
+    position: absolute;
+    inset: 6px;
+    border-radius: 50%;
+    border: 1px dashed rgba(201, 163, 92, .25);
+  }
+
+  /* ---------- run stats ---------- */
+  .stats { margin-top: var(--gap); }
+  .stats h2 {
+    margin: 0 0 .5rem;
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: clamp(1.7rem, 2.9vw, 2.2rem);
+    letter-spacing: .005em;
+    text-wrap: balance;
+  }
+  .stats .sub { max-width: 78ch; margin: 0 0 1.15rem; color: var(--muted); font-size: .98rem; }
+
+  .stat-band {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: .9rem 2.4rem;
+    margin: 0 0 1rem;
+    padding: 1rem 1.15rem;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--tint);
+  }
+  .band-label {
+    flex-basis: 100%;
+    margin: 0;
+    font-family: var(--mono);
+    font-size: .66rem;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--gold);
+  }
+  .band-items { display: flex; flex-wrap: wrap; gap: .85rem 2.6rem; margin: 0; }
+  .band-items > div { display: flex; flex-direction: column; gap: .1rem; }
+  .band-items dt {
+    font-family: var(--mono);
+    font-size: .66rem;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+  .band-items dd { margin: 0; font-family: var(--mono); font-size: 1.45rem; line-height: 1.2; color: var(--ink); font-variant-numeric: tabular-nums; }
+
+  .tbl-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--bg-soft); }
+  .stats-table { border-collapse: collapse; width: 100%; min-width: 960px; font-size: .86rem; }
+  .stats-table th, .stats-table td { padding: .55rem .85rem; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--line); }
+  .stats-table thead th { font-family: var(--mono); font-size: .68rem; letter-spacing: .08em; text-transform: uppercase; color: var(--gold); }
+  .stats-table th:first-child, .stats-table td:first-child { text-align: left; }
+  .stats-table tbody tr:hover { background: var(--tint); }
+  .stats-table tbody tr:last-child th, .stats-table tbody tr:last-child td { border-bottom: 0; }
+  .stats-table .num, .stats-table .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .stats-table tr.total td, .stats-table tr.total th { color: var(--gold-2); }
+  .cost-note { margin: .7rem 0 0; font-family: var(--mono); font-size: .74rem; line-height: 1.75; color: var(--faint); }
+
+  details.turnly { margin-top: .8rem; border: 1px solid var(--line); border-radius: 12px; background: var(--bg-soft); }
+  details.turnly summary { padding: .7rem .95rem; cursor: pointer; font-family: var(--mono); font-size: .78rem; color: var(--gold-2); }
+  details.turnly summary:hover { color: var(--gold); }
+  details.turnly[open] summary { border-bottom: 1px solid var(--line); }
+  details.turnly .tbl-wrap { border: 0; border-radius: 0 0 12px 12px; }
+  details.turnly .stats-table { min-width: 640px; }
+
+  /* ---------- footer ---------- */
+  footer {
+    max-width: var(--page);
+    margin: 0 auto;
+    padding: .25rem 1.5rem 2.75rem;
+    font-family: var(--mono);
+    font-size: .74rem;
+    color: var(--faint);
+  }
+  footer a { color: var(--gold); }
+
+  @media (max-width: 860px) {
+    .hero { grid-template-columns: 1fr; gap: 1.75rem; }
+    .rosette { order: -1; justify-self: start; width: clamp(140px, 34vw, 190px); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    *, *::before, *::after {
+      animation-duration: .001s !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: .001s !important;
+    }
+  }
+</style>
+</head>
+<body>
+<div id="stars" aria-hidden="true"></div>
+
+<div class="page">
+  <header class="hero">
+    <div class="hero-copy">
+      <h1>Four Astrolabes<span class="dot">.</span></h1>
+      <p class="arabic" lang="ar" dir="rtl">الأسطرلاب</p>
+      <p class="lede">
+        The brief: <em>“3D model this Islamic astrolabe.”</em> Four AI models
+        answered. Pick one to view, or open it full screen.
+      </p>
+      <p class="hint">Keys: <kbd>1</kbd>-<kbd>4</kbd> switch versions, <kbd>←</kbd>/<kbd>→</kbd> previous and next, <kbd>Esc</kbd> close.</p>
+    </div>
+    <div class="rosette" id="rosette" aria-hidden="true"></div>
+  </header>
+
+  <div class="notice" id="fileNotice" hidden>
+    Heads-up: this page is open from <code>file://</code>. Three of the four instruments use ES
+    modules and will not render in the embedded viewer. Serve the folder instead:
+    <code>python3 -m http.server 8000</code> and open <code>http://localhost:8000/</code>.
+    (The DS 4.1 F version works either way.)
+  </div>
+
+  <main>
+    <section class="grid" aria-label="Model versions">
+
+      <a class="card" href="#ds-4.1-f" data-id="ds-4.1-f" data-name="DS 4.1 F" data-entry="ds-4.1-f/index.html">
+        <figure class="thumb"><img src="assets/thumbs/ds-4.1-f.png" width="1440" height="900" alt="DS 4.1 F: polished brass astrolabe on a dark background" loading="lazy" decoding="async" /></figure>
+        <div class="card-body">
+          <div class="card-head"><h2>DS 4.1 F</h2><span class="tag">offline</span></div>
+          <p class="desc">A single-file build with a dark gallery presentation: polished brass rings, a slider for every ring, an auto-rotate button and a live FPS readout.</p>
+          <div class="notes">
+            <p class="notes-label">Test notes</p>
+            <p><strong>10 turns, seven of them mechanical fixes.</strong> The pole sat on the wrong axis, rings turned in the wrong plane, floated off the frame, and one build turned the pole instead of the rings. The per-ring sliders and auto-rotate were added once the joints held.</p>
+          </div>
+          <dl class="card-stats">
+            <div><dt>Turns</dt><dd>10</dd></div>
+            <div><dt>Calls</dt><dd>196</dd></div>
+            <div><dt>Time</dt><dd>72 min</dd></div>
+            <div><dt>Tokens</dt><dd>20.0M</dd></div>
+            <div><dt title="computed from standard list prices">Cost</dt><dd>≈$0.30</dd></div>
+          </dl>
+          <p class="meta">index.html · bundled three.js</p>
+          <span class="view-cta">View this version →</span>
+        </div>
+      </a>
+
+      <a class="card" href="#glm-5.3-flash" data-id="glm-5.3-flash" data-name="GLM 5.3 Flash" data-entry="glm-5.3-flash/islamic-astrolabe.html">
+        <figure class="thumb"><img src="assets/thumbs/glm-5.3-flash.png" width="1440" height="900" alt="GLM 5.3 Flash: full-bleed brass astrolabe with dense Arabic engraving" loading="lazy" decoding="async" /></figure>
+        <div class="card-body">
+          <div class="card-head"><h2>GLM 5.3 Flash</h2><span class="tag warn">needs internet</span></div>
+          <p class="desc">A full-bleed historic reconstruction with dense Arabic engraving and bilingual ring controls. three.js is pulled from the unpkg CDN, so it needs a connection.</p>
+          <div class="notes">
+            <p class="notes-label">Test notes</p>
+            <p><strong>4 turns.</strong> The first pass slid the rings across the plate instead of turning them around the main pole; later fixes seated the whole instrument back in its (rotatable) plate and connected both ends of the pole to it. Densest engraving of the four.</p>
+          </div>
+          <dl class="card-stats">
+            <div><dt>Turns</dt><dd>4</dd></div>
+            <div><dt>Calls</dt><dd>37</dd></div>
+            <div><dt>Time</dt><dd>58 min</dd></div>
+            <div><dt>Tokens</dt><dd>2.9M</dd></div>
+            <div><dt title="computed from standard list prices">Cost</dt><dd>≈$0.14</dd></div>
+          </dl>
+          <p class="meta">islamic-astrolabe.html · three.js via unpkg</p>
+          <span class="view-cta">View this version →</span>
+        </div>
+      </a>
+
+      <a class="card" href="#fable-5.1" data-id="fable-5.1" data-name="Fable 5.1" data-entry="fable-5.1/islamic-astrolabe.html">
+        <figure class="thumb"><img src="assets/thumbs/fable-5.1.png" width="1440" height="900" alt="Fable 5.1: patina-toned brass rings with teal controls" loading="lazy" decoding="async" /></figure>
+        <div class="card-body">
+          <div class="card-head"><h2>Fable 5.1</h2><span class="tag">offline</span></div>
+          <p class="desc">An editorial split layout: four rings and a globe sharing one axle, patina-toned brass with teal controls, plus a “Reset pose” action.</p>
+          <div class="notes">
+            <p class="notes-label">Test notes</p>
+            <p><strong>1 turn, no corrections.</strong> The rings tilt on the shared axle as the brief asked: one slider each, plus a reset pose. Lightest engraving of the four; the finish is in the materials.</p>
+          </div>
+          <dl class="card-stats">
+            <div><dt>Turns</dt><dd>1</dd></div>
+            <div><dt>Calls</dt><dd>19</dd></div>
+            <div><dt>Time</dt><dd>20 min</dd></div>
+            <div><dt>Tokens</dt><dd>2.0M</dd></div>
+            <div><dt title="recorded by the app">Cost</dt><dd>$7.78</dd></div>
+          </dl>
+          <p class="meta">islamic-astrolabe.html · ES modules</p>
+          <span class="view-cta">View this version →</span>
+        </div>
+      </a>
+
+      <a class="card" href="#opus-5.5" data-id="opus-5.5" data-name="Opus 5.5" data-entry="opus-5.5/islamic-astrolabe.html">
+        <figure class="thumb"><img src="assets/thumbs/opus-5.5.png" width="1440" height="900" alt="Opus 5.5: verdigris-inlaid astrolabe with a throne-crowned frame" loading="lazy" decoding="async" /></figure>
+        <div class="card-body">
+          <div class="card-head"><h2>Opus 5.5</h2><span class="tag">offline</span></div>
+          <p class="desc">Verdigris-inlaid rings in a throne-crowned frame, five rotating parts, three ring arrangements (Flat / Fanned / Crossed) and a reference-photo overlay.</p>
+          <div class="notes">
+            <p class="notes-label">Test notes</p>
+            <p><strong>1 turn, no corrections.</strong> Hinge, axle and five rotating parts came out right on the first pass; it adds posed ring arrangements (Flat / Fanned / Crossed) and a reference-photo overlay. Closest to the photo’s composition.</p>
+          </div>
+          <dl class="card-stats">
+            <div><dt>Turns</dt><dd>1</dd></div>
+            <div><dt>Calls</dt><dd>20</dd></div>
+            <div><dt>Time</dt><dd>30 min</dd></div>
+            <div><dt>Tokens</dt><dd>3.7M</dd></div>
+            <div><dt title="recorded by the app">Cost</dt><dd>$6.28</dd></div>
+          </dl>
+          <p class="meta">islamic-astrolabe.html · modular js/ and fonts</p>
+          <span class="view-cta">View this version →</span>
+        </div>
+      </a>
+
+    </section>
+
+    <section class="viewer" id="viewer" hidden aria-label="Version viewer">
+      <div class="viewer-bar">
+        <div class="viewer-id" aria-live="polite">
+          <span class="viewer-name" id="viewer-name"></span>
+          <span class="viewer-file" id="viewer-file"></span>
+        </div>
+        <div class="viewer-actions">
+          <button class="btn" id="prev" type="button" title="Previous version (Left arrow)">Previous</button>
+          <button class="btn" id="next" type="button" title="Next version (Right arrow)">Next</button>
+          <button class="btn" id="reload" type="button" title="Reload the embedded page">Reload</button>
+          <a class="btn primary" id="open-new" href="#" target="_blank" rel="noopener">Open in new tab</a>
+          <button class="btn" id="full" type="button">Fullscreen</button>
+          <button class="btn" id="close" type="button">Close</button>
+        </div>
+      </div>
+      <div class="frame-wrap" id="frame-wrap">
+        <iframe id="frame" title="Selected astrolabe version" allow="autoplay; fullscreen"></iframe>
+        <div class="loading" id="loading">
+          <div class="dial" aria-hidden="true"></div>
+          <span>Loading the instrument…</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- STATS:START -->
+<section class="stats" id="stats" aria-label="Run statistics">
+  <h2>Run stats</h2>
+  <p class="sub">Extracted from the Open Design run logs. A <em>turn</em> is one user prompt,
+  “calls” are model steps inside the runs, and total tokens include cached context re-reads.
+  Costs for DS 4.1 F and GLM 5.3 Flash are computed from standard list prices; Fable 5.1 and
+  Opus 5.5 show the cost recorded by the app.</p>
+  <div class="stat-band">
+    <p class="band-label">All four, combined</p>
+    <dl class="band-items">
+      <div><dt>Turns</dt><dd>16</dd></div>
+      <div><dt>Model calls</dt><dd>272</dd></div>
+      <div><dt>Active time</dt><dd>145 min</dd></div>
+      <div><dt>Total tokens</dt><dd>28.6M</dd></div>
+      <div><dt>Total cost</dt><dd>≈$14.50</dd></div>
+    </dl>
+  </div>
+  <div class="tbl-wrap">
+    <table class="stats-table">
+      <thead><tr><th>Metric</th><th>DS 4.1 F</th><th>GLM 5.3 Flash</th><th>Fable 5.1</th><th>Opus 5.5</th><th>All four</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">Model</th><td class="mono">deepseek-v4.1-flash</td><td class="mono">glm-5.3-flash</td><td class="mono">fable</td><td class="mono">opus</td><td class="mono">four models</td></tr>
+        <tr><th scope="row">Turns</th><td class="num">10</td><td class="num">4</td><td class="num">1</td><td class="num">1</td><td class="num">16</td></tr>
+        <tr><th scope="row">Model calls</th><td class="num">196</td><td class="num">37</td><td class="num">19</td><td class="num">20</td><td class="num">272</td></tr>
+        <tr><th scope="row">Wall clock</th><td class="num">72.2 min</td><td class="num">58.5 min</td><td class="num">20.0 min</td><td class="num">30.1 min</td><td class="num">90 min span</td></tr>
+        <tr><th scope="row">Active time</th><td class="num">44.2 min</td><td class="num">50.9 min</td><td class="num">19.9 min</td><td class="num">30.0 min</td><td class="num">145.0 min</td></tr>
+        <tr><th scope="row">Fresh input</th><td class="num">140,298</td><td class="num">137,918</td><td class="num">578</td><td class="num">40</td><td class="num">278,834</td></tr>
+        <tr><th scope="row">Cache read</th><td class="num">19,446,912</td><td class="num">2,664,320</td><td class="num">1,779,774</td><td class="num">3,299,470</td><td class="num">27,190,476</td></tr>
+        <tr><th scope="row">Output</th><td class="num">57,997</td><td class="num">26,949</td><td class="num">89,683</td><td class="num">185,965</td><td class="num">360,594</td></tr>
+        <tr><th scope="row">Reasoning</th><td class="num">308,094</td><td class="num">44,354</td><td class="num">55,502*</td><td class="num">130,645*</td><td class="num">538,595</td></tr>
+        <tr><th scope="row">Total tokens</th><td class="num">19,953,301</td><td class="num">2,873,541</td><td class="num">2,012,458</td><td class="num">3,722,654</td><td class="num">28,561,954</td></tr>
+        <tr class="total"><th scope="row">Cost</th><td class="num cost">≈$0.30ᶜ</td><td class="num cost">≈$0.14ᶜ</td><td class="num cost">$7.78ʳ</td><td class="num cost">$6.28ʳ</td><td class="num cost">≈$14.50</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="cost-note">ᶜ computed from standard list prices. DS 4.1 F: input $0.15/M, output $0.60/M, cache read $0.003/M.
+  GLM 5.3 Flash: input $0.15/M, output $0.50/M, cache read $0.03/M. Reasoning billed as output.
+  ʳ recorded by the app. * Claude thinking tokens are included in the output figure.</p>
+  <details class="turnly">
+    <summary>DS 4.1 F: turn-by-turn (10 turns, 44 min active)</summary>
+    <div class="tbl-wrap">
+      <table class="stats-table">
+        <thead><tr><th>Turn</th><th>Time</th><th>Calls</th><th>Fresh in</th><th>Cache read</th><th>Output</th><th>Total tokens</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td class="num">395 s</td><td class="num">17</td><td class="num">28,768</td><td class="num">1,327,744</td><td class="num">19,755</td><td class="num">1,435,606</td></tr>
+          <tr><td>2</td><td class="num">261 s</td><td class="num">14</td><td class="num">14,661</td><td class="num">2,104,320</td><td class="num">6,877</td><td class="num">2,165,279</td></tr>
+          <tr><td>3</td><td class="num">136 s</td><td class="num">11</td><td class="num">3,859</td><td class="num">1,995,520</td><td class="num">6,003</td><td class="num">2,021,239</td></tr>
+          <tr><td>4</td><td class="num">251 s</td><td class="num">15</td><td class="num">20,884</td><td class="num">604,160</td><td class="num">1,593</td><td class="num">661,240</td></tr>
+          <tr><td>5</td><td class="num">292 s</td><td class="num">21</td><td class="num">19,975</td><td class="num">1,969,792</td><td class="num">4,177</td><td class="num">2,033,038</td></tr>
+          <tr><td>6</td><td class="num">161 s</td><td class="num">11</td><td class="num">4,589</td><td class="num">1,301,504</td><td class="num">1,897</td><td class="num">1,327,050</td></tr>
+          <tr><td>7</td><td class="num">380 s</td><td class="num">27</td><td class="num">9,766</td><td class="num">4,305,920</td><td class="num">4,866</td><td class="num">4,358,494</td></tr>
+          <tr><td>8</td><td class="num">140 s</td><td class="num">14</td><td class="num">4,569</td><td class="num">2,573,824</td><td class="num">2,385</td><td class="num">2,588,156</td></tr>
+          <tr><td>9</td><td class="num">409 s</td><td class="num">40</td><td class="num">21,500</td><td class="num">1,504,000</td><td class="num">4,873</td><td class="num">1,570,679</td></tr>
+          <tr><td>10</td><td class="num">226 s</td><td class="num">26</td><td class="num">11,727</td><td class="num">1,760,128</td><td class="num">5,571</td><td class="num">1,792,520</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </details>
+  <details class="turnly">
+    <summary>GLM 5.3 Flash: turn-by-turn (4 turns, 51 min active)</summary>
+    <div class="tbl-wrap">
+      <table class="stats-table">
+        <thead><tr><th>Turn</th><th>Time</th><th>Calls</th><th>Fresh in</th><th>Cache read</th><th>Output</th><th>Total tokens</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td class="num">848 s</td><td class="num">9</td><td class="num">88,139</td><td class="num">290,752</td><td class="num">13,351</td><td class="num">408,802</td></tr>
+          <tr><td>2</td><td class="num">1087 s</td><td class="num">14</td><td class="num">31,439</td><td class="num">1,049,024</td><td class="num">8,041</td><td class="num">1,108,635</td></tr>
+          <tr><td>3</td><td class="num">587 s</td><td class="num">8</td><td class="num">12,561</td><td class="num">730,112</td><td class="num">4,375</td><td class="num">752,825</td></tr>
+          <tr><td>4</td><td class="num">534 s</td><td class="num">6</td><td class="num">5,779</td><td class="num">594,432</td><td class="num">1,182</td><td class="num">603,279</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </details>
+  <details class="turnly">
+    <summary>Fable 5.1: turn-by-turn (1 turn, 20 min active)</summary>
+    <div class="tbl-wrap">
+      <table class="stats-table">
+        <thead><tr><th>Turn</th><th>Time</th><th>Calls</th><th>Fresh in</th><th>Cache read</th><th>Output</th><th>Total tokens</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td class="num">1194 s</td><td class="num">19</td><td class="num">578</td><td class="num">1,779,774</td><td class="num">89,683</td><td class="num">2,012,458</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </details>
+  <details class="turnly">
+    <summary>Opus 5.5: turn-by-turn (1 turn, 30 min active)</summary>
+    <div class="tbl-wrap">
+      <table class="stats-table">
+        <thead><tr><th>Turn</th><th>Time</th><th>Calls</th><th>Fresh in</th><th>Cache read</th><th>Output</th><th>Total tokens</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td class="num">1802 s</td><td class="num">20</td><td class="num">40</td><td class="num">3,299,470</td><td class="num">185,965</td><td class="num">3,722,654</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </details>
+</section>
+    <!-- STATS:END -->
+  </main>
+
+  <footer>
+    Four static copies of Open Design projects. See the <a href="README.md">README</a>.
+    Served at <span id="origin"></span>.
+  </footer>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ---------- star field ---------- */
+  (function stars() {
+    var host = document.getElementById('stars');
+    var seed = 20260926;
+    function rnd() { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; }
+    var frag = document.createDocumentFragment();
+    for (var i = 0; i < 120; i++) {
+      var s = document.createElement('i');
+      var size = .6 + rnd() * 1.4;
+      s.style.left = (rnd() * 100) + '%';
+      s.style.top = (rnd() * 100) + '%';
+      s.style.width = size + 'px';
+      s.style.height = size + 'px';
+      s.style.opacity = (.12 + rnd() * .5).toFixed(2);
+      if (rnd() > .9) { s.style.background = '#e8c98a'; }
+      frag.appendChild(s);
+    }
+    host.appendChild(frag);
+  })();
+
+  /* ---------- astrolabe rosette ---------- */
+  (function rosette() {
+    var host = document.getElementById('rosette');
+    var NS = 'http://www.w3.org/2000/svg';
+    var svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 260 260');
+
+    function add(parent, tag, attrs) {
+      var el = document.createElementNS(NS, tag);
+      for (var k in attrs) el.setAttribute(k, attrs[k]);
+      parent.appendChild(el);
+      return el;
+    }
+    function ring(parent, r, w, o, dash) {
+      add(parent, 'circle', { cx: 130, cy: 130, r: r, fill: 'none', stroke: 'currentColor', 'stroke-width': w, opacity: o, 'stroke-dasharray': dash || 'none' });
+    }
+
+    var base = add(svg, 'g', {});
+    ring(base, 118, .8, .55);
+    ring(base, 30, .8, .5);
+    add(base, 'circle', { cx: 130, cy: 130, r: 2.4, fill: 'currentColor', opacity: .9 });
+
+    var spinGroup = add(svg, 'g', { class: 'spin' });
+    ring(spinGroup, 104, .55, .4);
+    for (var i = 0; i < 72; i++) {
+      var a = (i / 72) * Math.PI * 2;
+      var long = i % 6 === 0;
+      var r1 = long ? 96 : 104, r2 = 118;
+      add(spinGroup, 'line', {
+        x1: 130 + Math.cos(a) * r1, y1: 130 + Math.sin(a) * r1,
+        x2: 130 + Math.cos(a) * r2, y2: 130 + Math.sin(a) * r2,
+        stroke: 'currentColor', 'stroke-width': long ? .9 : .5, opacity: long ? .75 : .45
+      });
+    }
+
+    var spinRev = add(svg, 'g', { class: 'spin-rev' });
+    ring(spinRev, 84, .6, .45, '3 5');
+    var alidade = add(spinRev, 'g', {});
+    add(alidade, 'line', { x1: 40, y1: 130, x2: 220, y2: 130, stroke: 'currentColor', 'stroke-width': 1.1, opacity: .85 });
+    add(alidade, 'circle', { cx: 40, cy: 130, r: 3, fill: 'none', stroke: 'currentColor', 'stroke-width': 1, opacity: .85 });
+    add(alidade, 'circle', { cx: 220, cy: 130, r: 3, fill: 'none', stroke: 'currentColor', 'stroke-width': 1, opacity: .85 });
+    var rete = add(svg, 'g', { class: 'spin' });
+    ring(rete, 74, .5, .5);
+    add(rete, 'path', { d: 'M 130 56 C 148 84 148 112 130 130 C 112 112 112 84 130 56 Z', fill: 'none', stroke: 'currentColor', 'stroke-width': .7, opacity: .5 });
+
+    host.appendChild(svg);
+  })();
+
+  /* ---------- viewer logic ---------- */
+  var cards = Array.prototype.slice.call(document.querySelectorAll('.card'));
+  var viewer = document.getElementById('viewer');
+  var frame = document.getElementById('frame');
+  var frameWrap = document.getElementById('frame-wrap');
+  var loading = document.getElementById('loading');
+  var nameEl = document.getElementById('viewer-name');
+  var fileEl = document.getElementById('viewer-file');
+  var openNew = document.getElementById('open-new');
+  var fullBtn = document.getElementById('full');
+  var CTA = 'View this version →';
+  var CTA_ACTIVE = 'Now viewing';
+  var current = -1;
+
+  function byId(id) {
+    for (var i = 0; i < cards.length; i++) if (cards[i].dataset.id === id) return i;
+    return -1;
+  }
+
+  function select(i, opts) {
+    opts = opts || {};
+    if (i < 0 || i >= cards.length) return;
+    var card = cards[i];
+    current = i;
+
+    cards.forEach(function (c, j) {
+      var active = j === i;
+      c.setAttribute('aria-current', active ? 'true' : 'false');
+      var cta = c.querySelector('.view-cta');
+      if (cta) cta.textContent = active ? CTA_ACTIVE : CTA;
+    });
+
+    nameEl.textContent = card.dataset.name;
+    fileEl.textContent = card.dataset.entry;
+    openNew.href = card.dataset.entry;
+    loading.classList.remove('hidden');
+    frame.src = card.dataset.entry;
+    viewer.hidden = false;
+
+    if (opts.scroll !== false) {
+      viewer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    if (opts.push !== false) {
+      history.pushState({ id: card.dataset.id }, '', '#' + card.dataset.id);
+    }
+  }
+
+  function closeViewer(opts) {
+    opts = opts || {};
+    current = -1;
+    viewer.hidden = true;
+    frame.src = 'about:blank';
+    cards.forEach(function (c) {
+      c.setAttribute('aria-current', 'false');
+      var cta = c.querySelector('.view-cta');
+      if (cta) cta.textContent = CTA;
+    });
+    if (opts.push !== false) {
+      history.pushState({}, '', location.pathname + location.search);
+    }
+  }
+
+  cards.forEach(function (card, i) {
+    card.addEventListener('click', function (ev) {
+      ev.preventDefault();
+      select(i);
+    });
+  });
+
+  document.getElementById('prev').addEventListener('click', function () {
+    select((current - 1 + cards.length) % cards.length, { scroll: false });
+  });
+  document.getElementById('next').addEventListener('click', function () {
+    select((current + 1) % cards.length, { scroll: false });
+  });
+  document.getElementById('reload').addEventListener('click', function () {
+    if (current < 0) return;
+    loading.classList.remove('hidden');
+    frame.src = 'about:blank';
+    setTimeout(function () { frame.src = cards[current].dataset.entry; }, 60);
+  });
+  document.getElementById('close').addEventListener('click', function () { closeViewer(); });
+
+  fullBtn.addEventListener('click', function () {
+    if (document.fullscreenElement) { document.exitFullscreen(); return; }
+    if (frameWrap.requestFullscreen) frameWrap.requestFullscreen();
+  });
+  document.addEventListener('fullscreenchange', function () {
+    fullBtn.textContent = document.fullscreenElement ? 'Exit fullscreen' : 'Fullscreen';
+  });
+
+  frame.addEventListener('load', function () {
+    if (!viewer.hidden) setTimeout(function () { loading.classList.add('hidden'); }, 250);
+  });
+
+  window.addEventListener('keydown', function (ev) {
+    if (ev.target && /input|textarea|select/i.test(ev.target.tagName)) return;
+    if (ev.key >= '1' && ev.key <= String(cards.length)) {
+      select(parseInt(ev.key, 10) - 1, { scroll: false });
+    } else if (ev.key === 'Escape') {
+      closeViewer();
+    } else if (ev.key === 'ArrowLeft' && current >= 0) {
+      select((current - 1 + cards.length) % cards.length, { scroll: false });
+    } else if (ev.key === 'ArrowRight' && current >= 0) {
+      select((current + 1) % cards.length, { scroll: false });
+    }
+  });
+
+  window.addEventListener('popstate', function (ev) {
+    var id = (ev.state && ev.state.id) || location.hash.replace(/^#/, '');
+    var i = byId(id);
+    if (i >= 0) select(i, { scroll: false, push: false });
+    else closeViewer({ push: false });
+  });
+
+  /* file:// warning */
+  if (location.protocol === 'file:') document.getElementById('fileNotice').hidden = false;
+  document.getElementById('origin').textContent = location.origin === 'null' ? 'file://' : location.origin;
+
+  /* restore from hash */
+  var initial = byId(location.hash.replace(/^#/, ''));
+  if (initial >= 0) {
+    select(initial, { scroll: false, push: false });
+    history.replaceState({ id: cards[initial].dataset.id }, '', '#' + cards[initial].dataset.id);
+  }
+})();
+</script>
+</body>
+</html>

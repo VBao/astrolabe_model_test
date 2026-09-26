@@ -1,0 +1,11 @@
+# Open Design app-internal metadata — kept in the working folder, excluded from publication
+# (version snapshots, prompt texts and internal IDs that are not part of the demo site)
+**/.file-versions/
+**/.od-skills/
+
+# Open Design export sidecar files (artifact metadata; the pages don't need them)
+**/*.artifact.json
+
+# OS noise
+.DS_Store
+Thumbs.db

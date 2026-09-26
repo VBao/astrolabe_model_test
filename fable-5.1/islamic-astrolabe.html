@@ -1,0 +1,604 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Islamic Astrolabe — engraved brass rings in 3D</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: oklch(0.17 0.012 60);
+    --surface: oklch(0.22 0.014 60 / 0.78);
+    --fg: oklch(0.94 0.02 85);
+    --muted: oklch(0.72 0.02 80);
+    --border: oklch(0.42 0.02 70 / 0.55);
+    --accent: oklch(0.78 0.10 195);
+    --font-display: 'Cormorant Garamond', 'Noto Serif Display', 'Noto Serif', Georgia, serif;
+    --font-body: 'Albert Sans', 'Noto Sans', system-ui, sans-serif;
+    --font-arabic: 'Noto Naskh Arabic', 'Amiri', 'Scheherazade New', serif;
+  }
+  html, body { margin: 0; height: 100%; background: var(--bg); overflow: hidden; font-family: var(--font-body); color: var(--fg); }
+  #gl { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  .vignette { position: fixed; inset: 0; pointer-events: none; z-index: 1;
+    background: radial-gradient(ellipse at 50% 45%, transparent 42%, oklch(0.09 0.01 60 / 0.6) 100%); }
+  .overlay { position: fixed; left: clamp(20px, 4vw, 56px); bottom: clamp(20px, 4vw, 56px); z-index: 2; pointer-events: none; max-width: min(44ch, calc(100vw - 340px)); }
+  .kicker { margin: 0 0 14px; font-size: 13px; letter-spacing: 0.34em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
+  .kicker .ar { font-family: var(--font-arabic); letter-spacing: 0; text-transform: none; font-size: 18px; font-weight: 500; margin-inline-end: 12px; }
+  h1 { margin: 0; font-family: var(--font-display); font-weight: 500; font-size: clamp(40px, 6.4vw, 92px); line-height: 0.95; letter-spacing: -0.012em; max-width: 14ch; text-shadow: 0 2px 30px oklch(0 0 0 / 0.5); }
+  .sub { margin: 18px 0 0; font-size: clamp(14px, 1.2vw, 17px); line-height: 1.5; color: var(--muted); max-width: 44ch; }
+  .badge { position: fixed; top: clamp(16px, 3vw, 40px); right: clamp(16px, 3vw, 40px); z-index: 2; pointer-events: none;
+    font-size: 11px; letter-spacing: 0.26em; text-transform: uppercase; color: var(--muted);
+    border: 1px solid var(--border); padding: 8px 14px; border-radius: 999px; backdrop-filter: blur(6px); background: oklch(0.2 0.01 60 / 0.4); }
+  .panel { position: fixed; right: clamp(16px, 3vw, 40px); top: 50%; transform: translateY(-50%); width: 268px; z-index: 2;
+    background: var(--surface); backdrop-filter: blur(14px); border: 1px solid var(--border); border-radius: 14px; padding: 16px 16px 12px; }
+  .panel h2 { margin: 0; font-family: var(--font-display); font-weight: 500; font-size: 22px; letter-spacing: 0.01em; }
+  .panel .hint { margin: 6px 0 10px; font-size: 12px; line-height: 1.45; color: var(--muted); }
+  .row { display: grid; grid-template-columns: 1fr auto; align-items: baseline; column-gap: 10px; padding: 6px 8px 2px; margin: 0 -8px; border-top: 1px solid var(--border); border-radius: 8px; }
+  .row.is-hot { background: oklch(0.30 0.02 70 / 0.6); }
+  .row .name { font-size: 14px; font-weight: 600; }
+  .row .name .ar { font-family: var(--font-arabic); font-weight: 400; color: var(--muted); margin-inline-start: 8px; font-size: 15px; }
+  .row .val { font-variant-numeric: tabular-nums; font-size: 13px; color: var(--muted); }
+  .row .val.is-hot { color: var(--fg); }
+  input[type=range] { grid-column: 1 / -1; width: 100%; height: 44px; margin: -6px 0 0; background: transparent; -webkit-appearance: none; appearance: none; cursor: pointer; }
+  input[type=range]::-webkit-slider-runnable-track { height: 3px; background: oklch(0.46 0.02 70); border-radius: 2px; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; margin-top: -7.5px; border-radius: 50%; background: var(--accent); border: 2px solid oklch(0.17 0.012 60); }
+  input[type=range]::-moz-range-track { height: 3px; background: oklch(0.46 0.02 70); border-radius: 2px; }
+  input[type=range]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--accent); border: 2px solid oklch(0.17 0.012 60); }
+  input[type=range]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+  .actions { display: flex; gap: 10px; align-items: center; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+  .btn { min-height: 44px; padding: 0 18px; border-radius: 10px; border: 1px solid var(--border); background: transparent; color: var(--fg); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .btn:hover { background: oklch(0.32 0.02 70); border-color: oklch(0.55 0.02 70); }
+  .btn:active { background: oklch(0.28 0.02 70); }
+  .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .status { font-size: 12px; color: var(--muted); }
+  .fallback { position: fixed; inset: 0; z-index: 3; display: none; place-items: center; text-align: center; padding: 24px; background: var(--bg); }
+  .fallback.show { display: grid; }
+  .fallback h2 { font-family: var(--font-display); font-weight: 500; font-size: 32px; margin: 0 0 10px; }
+  .fallback p { color: var(--muted); max-width: 48ch; margin: 0; line-height: 1.5; }
+  @media (max-width: 820px) {
+    .overlay { bottom: auto; top: 14px; left: 16px; max-width: 58vw; }
+    h1 { font-size: 30px; }
+    .sub { display: none; }
+    .kicker { margin-bottom: 8px; font-size: 11px; }
+    .badge { top: 14px; right: 14px; }
+    .panel { left: 12px; right: 12px; top: auto; bottom: 12px; transform: none; width: auto; max-height: 46vh; overflow: auto; padding: 12px 14px 10px; }
+    .panel .hint { display: none; }
+    .overlay { max-width: calc(100vw - 32px); }
+  }
+</style>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.js", "three/addons/": "./vendor/" } }
+</script>
+</head>
+<body>
+<canvas id="gl" data-od-id="astrolabe-canvas" aria-label="Interactive 3D model of an Islamic spherical astrolabe"></canvas>
+<div class="vignette"></div>
+<div class="badge" id="fps" data-od-id="fps-badge">Engraving brass…</div>
+
+<div class="overlay" data-od-id="hero-overlay">
+  <p class="kicker" data-od-id="kicker"><span class="ar">الأسطرلاب الكروي</span>Islamic astrolabe</p>
+  <h1 data-od-id="headline">Engraved brass</h1>
+  <p class="sub" data-od-id="subline">A spherical astrolabe modelled from the reference photograph. Drag any ring to tilt it on the axle, or use the controls. Drag the background to orbit.</p>
+</div>
+
+<aside class="panel" data-od-id="ring-panel" aria-label="Ring controls">
+  <h2>Rings</h2>
+  <p class="hint">Each ring turns on the shared axle. Drag it in the scene or move its slider.</p>
+  <div id="rows"></div>
+  <div class="actions">
+    <button class="btn" id="reset" data-od-id="reset-button" type="button">Reset pose</button>
+    <span class="status" id="status"></span>
+  </div>
+</aside>
+
+<div class="fallback" id="fallback" data-od-id="webgl-fallback">
+  <div>
+    <h2>3D view unavailable</h2>
+    <p>This model needs WebGL2. Open the page in a current desktop or mobile browser with hardware acceleration enabled.</p>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/RoomEnvironment.js';
+
+const TAU = Math.PI * 2;
+const $ = s => document.querySelector(s);
+const badge = $('#fps');
+window.__astroBooted = true;
+
+function fail(msg) {
+  $('#fallback p').textContent = msg;
+  $('#fallback').classList.add('show');
+  badge.textContent = 'Unavailable';
+}
+
+/* ---------- colour helpers (OKLCH → sRGB) ---------- */
+function oklch(L, C, h, a = 1) {
+  const hr = h * Math.PI / 180, A = C * Math.cos(hr), B = C * Math.sin(hr);
+  const l_ = L + 0.3963377774 * A + 0.2158037573 * B;
+  const m_ = L - 0.1055613458 * A - 0.0638541728 * B;
+  const s_ = L - 0.0894841775 * A - 1.2914855480 * B;
+  const l = l_ ** 3, m = m_ ** 3, s = s_ ** 3;
+  const r = 4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s;
+  const g = -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s;
+  const b = -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s;
+  const f = x => { x = Math.max(0, Math.min(1, x)); return Math.round((x <= 0.0031308 ? 12.92 * x : 1.055 * Math.pow(x, 1 / 2.4) - 0.055) * 255); };
+  return `rgba(${f(r)},${f(g)},${f(b)},${a})`;
+}
+const C = {
+  brass: oklch(0.72, 0.10, 85), brassHi: oklch(0.85, 0.08, 92), brassLo: oklch(0.56, 0.09, 78),
+  globe: oklch(0.62, 0.09, 76), globeHi: oklch(0.76, 0.08, 84), globeLo: oklch(0.47, 0.08, 70),
+  engrave: oklch(0.26, 0.035, 65), verd: oklch(0.72, 0.10, 195), verdDeep: oklch(0.55, 0.09, 200),
+};
+function rng(seed) { let a = seed >>> 0; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+/* ---------- engraved content (real names) ---------- */
+const AD = '٠١٢٣٤٥٦٧٨٩';
+const num = n => String(n).replace(/\d/g, d => AD[d]);
+const AR_FONT = '"Noto Naskh Arabic","Amiri","Scheherazade New","Traditional Arabic",serif';
+const ZODIAC = ['الحمل', 'الثور', 'الجوزاء', 'السرطان', 'الأسد', 'السنبلة', 'الميزان', 'العقرب', 'القوس', 'الجدي', 'الدلو', 'الحوت'];
+const MANSIONS = ['الشرطين', 'البطين', 'الثريا', 'الدبران', 'الهقعة', 'الهنعة', 'الذراع', 'النثرة', 'الطرف', 'الجبهة', 'الزبرة', 'الصرفة', 'العواء', 'السماك', 'الغفر', 'الزبانى', 'الإكليل', 'القلب', 'الشولة', 'النعائم', 'البلدة', 'سعد الذابح', 'سعد بلع', 'سعد السعود', 'سعد الأخبية', 'الفرغ المقدم', 'الفرغ المؤخر', 'بطن الحوت'];
+const MONTHS = ['محرم', 'صفر', 'ربيع الأول', 'ربيع الآخر', 'جمادى الأولى', 'جمادى الآخرة', 'رجب', 'شعبان', 'رمضان', 'شوال', 'ذو القعدة', 'ذو الحجة'];
+const PLANETS = ['زحل', 'المشتري', 'المريخ', 'الشمس', 'الزهرة', 'عطارد', 'القمر'];
+// [Arabic name or '', RA°, Dec°, magnitude] — J2000, rounded
+const STARS = [
+  ['يد الجوزاء', 88.8, 7.4, 0.5], ['رجل الجبار', 78.6, -8.2, 0.1], ['الناجذ', 81.3, 6.3, 1.6], ['', 85.2, -1.9, 1.8], ['النظام', 84.1, -1.2, 1.7], ['', 83.0, -0.3, 2.2], ['', 86.9, -9.7, 2.1],
+  ['الشعرى اليمانية', 101.3, -16.7, -1.4], ['الشعرى الشامية', 114.8, 5.2, 0.4], ['الدبران', 69.0, 16.5, 0.9], ['العيوق', 79.2, 46.0, 0.1], ['', 116.3, 28.0, 1.1], ['', 113.6, 31.9, 1.6],
+  ['قلب الأسد', 152.1, 12.0, 1.4], ['ذنب الأسد', 177.3, 14.6, 2.1], ['', 155.0, 19.8, 2.0], ['', 168.5, 20.5, 2.6], ['السماك الرامح', 213.9, 19.2, 0.0], ['السماك الأعزل', 201.3, -11.2, 1.0],
+  ['قلب العقرب', 247.4, -26.4, 1.0], ['الشولة', 263.4, -37.1, 1.6], ['', 240.1, -22.6, 2.3], ['', 264.3, -43.0, 1.9], ['النسر الواقع', 279.2, 38.8, 0.0], ['النسر الطائر', 297.7, 8.9, 0.8],
+  ['ذنب الدجاجة', 310.4, 45.3, 1.3], ['', 305.6, 40.3, 2.2], ['', 292.7, 28.0, 3.1], ['فم الحوت', 344.4, -29.6, 1.2], ['رأس الغول', 47.0, 41.0, 2.1], ['', 38.0, 89.3, 2.0],
+  ['', 222.7, 74.2, 2.1], ['', 230.2, 71.8, 3.0], ['', 165.9, 61.8, 1.8], ['', 165.5, 56.4, 2.4], ['', 178.5, 53.7, 2.4], ['', 183.9, 57.0, 3.3], ['', 193.5, 56.0, 1.8], ['', 201.0, 54.9, 2.2], ['', 206.9, 49.3, 1.9],
+  ['', 10.1, 56.5, 2.2], ['', 2.3, 59.1, 2.3], ['', 14.2, 60.7, 2.5], ['', 21.5, 60.2, 2.7], ['', 28.6, 63.7, 3.4], ['آخر النهر', 24.4, -57.2, 0.5], ['سهيل', 96.0, -52.7, -0.7], ['الفرد', 141.9, -8.7, 2.0],
+  ['رأس الحواء', 263.7, 12.6, 2.1], ['رأس الحمل', 31.8, 23.5, 2.0], ['', 17.4, 35.6, 2.1], ['السرة', 2.1, 29.1, 2.1], ['', 31.0, 42.3, 2.1], ['', 346.2, 15.2, 2.5], ['', 345.9, 28.1, 2.4], ['', 3.3, 15.2, 2.8],
+  ['', 332.1, -47.0, 1.7], ['الفكة', 233.7, 26.7, 2.2], ['', 45.6, 4.1, 2.5], ['ذنب القيطس', 10.9, -18.0, 2.0], ['', 81.6, 28.6, 1.7], ['', 326.0, 9.9, 2.4],
+  ['', 183.0, -17.5, 2.6], ['', 187.5, -16.5, 2.9], ['', 188.6, -23.4, 2.6], ['', 182.5, -22.6, 3.0],
+];
+const LINES = [[0, 3], [0, 2], [2, 5], [5, 4], [4, 3], [5, 1], [3, 6], [1, 6], [33, 34], [34, 35], [35, 36], [36, 33], [36, 37], [37, 38], [38, 39], [41, 40], [40, 42], [42, 43], [43, 44],
+  [13, 15], [15, 16], [16, 14], [14, 13], [21, 19], [19, 20], [20, 22], [25, 26], [26, 27], [11, 12], [30, 31], [31, 32], [51, 55], [55, 53], [53, 54], [54, 51], [51, 50], [50, 52], [62, 63], [63, 64], [64, 65], [65, 62], [53, 61]];
+const GROUPS = [['الجبار', 90, -4], ['الدب الأكبر', 186, 51], ['ذات الكرسي', 16, 54], ['الأسد', 165, 17], ['العقرب', 253, -32], ['الدجاجة', 300, 35], ['الغراب', 185, -13], ['الفرس الأعظم', 352, 21], ['الدب الأصغر', 226, 68], ['المرأة المسلسلة', 20, 38]];
+
+/* ---------- canvas engraving toolkit (coordinates in mm) ---------- */
+let MAXTEX = 8192, ANISO = 1;
+function cv(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+function tint(eng, color) {
+  const c = cv(eng.width, eng.height), x = c.getContext('2d');
+  x.fillStyle = color; x.fillRect(0, 0, c.width, c.height);
+  x.globalCompositeOperation = 'destination-in'; x.drawImage(eng, 0, 0); return c;
+}
+function patina(eng, R) {
+  const c = cv(eng.width, eng.height), x = c.getContext('2d'), W = c.width, H = c.height;
+  x.fillStyle = C.engrave; x.fillRect(0, 0, W, H);
+  const n = Math.max(40, (W * H) / 14000);
+  for (let i = 0; i < n; i++) {
+    x.fillStyle = R() < 0.6 ? C.verd : C.verdDeep; x.globalAlpha = 0.6 + R() * 0.35;
+    x.beginPath(); x.ellipse(R() * W, R() * H, H * (0.08 + R() * 0.3), H * (0.05 + R() * 0.2), R() * Math.PI, 0, TAU); x.fill();
+  }
+  x.globalAlpha = 1; x.globalCompositeOperation = 'destination-in'; x.drawImage(eng, 0, 0); return c;
+}
+function brushed(x, W, H, R, base, hi, lo, dir = 'x') {
+  x.fillStyle = base; x.fillRect(0, 0, W, H);
+  const n = (dir === 'x' ? H : W) * 1.6;
+  for (let i = 0; i < n; i++) {
+    x.strokeStyle = R() < 0.5 ? hi : lo; x.globalAlpha = 0.04 + R() * 0.1; x.lineWidth = 0.6 + R() * 1.2;
+    x.beginPath();
+    if (dir === 'x') { const y = R() * H; x.moveTo(0, y); x.lineTo(W, y + (R() - 0.5) * 3); }
+    else { const xx = R() * W; x.moveTo(xx, 0); x.lineTo(xx + (R() - 0.5) * 3, H); }
+    x.stroke();
+  }
+  for (let i = 0; i < 14; i++) {
+    const cx = R() * W, cy = R() * H, r = H * (0.5 + R() * 1.5);
+    const g = x.createRadialGradient(cx, cy, 0, cx, cy, r);
+    const c0 = R() < 0.55 ? lo : hi; g.addColorStop(0, c0); g.addColorStop(1, 'rgba(0,0,0,0)');
+    x.globalAlpha = 0.12; x.fillStyle = g; x.fillRect(cx - r, cy - r, r * 2, r * 2);
+  }
+  for (let i = 0; i < 10; i++) {
+    const cx = R() * W, cy = R() * H, r = H * (0.3 + R() * 0.8);
+    const g = x.createRadialGradient(cx, cy, 0, cx, cy, r); g.addColorStop(0, C.verdDeep); g.addColorStop(1, 'rgba(0,0,0,0)');
+    x.globalAlpha = 0.07; x.fillStyle = g; x.fillRect(cx - r, cy - r, r * 2, r * 2);
+  }
+  x.globalAlpha = 1;
+}
+function finishSet(eng, R, pal = [C.brass, C.brassHi, C.brassLo], dir = 'x') {
+  const W = eng.width, H = eng.height;
+  const col = cv(W, H), c = col.getContext('2d'); brushed(c, W, H, R, pal[0], pal[1], pal[2], dir);
+  c.globalAlpha = 0.5; c.drawImage(tint(eng, pal[1]), 0, Math.max(1, Math.round(H * 0.004))); c.globalAlpha = 1;
+  c.drawImage(patina(eng, R), 0, 0);
+  const bump = cv(W, H), b = bump.getContext('2d'); brushed(b, W, H, R, '#cdcdcd', '#e6e6e6', '#b4b4b4', dir); b.drawImage(tint(eng, '#0e0e0e'), 0, 0);
+  const rm = cv(W, H), m = rm.getContext('2d'); m.fillStyle = 'rgb(0,102,255)'; m.fillRect(0, 0, W, H);
+  for (let i = 0; i < 24; i++) { m.globalAlpha = 0.25; m.fillStyle = 'rgb(0,170,235)'; m.beginPath(); m.ellipse(R() * W, R() * H, H * (0.4 + R()), H * (0.2 + R() * 0.5), R() * 3, 0, TAU); m.fill(); }
+  m.globalAlpha = 1; m.drawImage(tint(eng, 'rgb(0,226,28)'), 0, 0);
+  return { col, bump, rm };
+}
+function engCtx(W, H, mmW, mmH) {
+  const eng = cv(W, H), g = eng.getContext('2d');
+  g.setTransform(W / mmW, 0, 0, H / mmH, 0, 0);
+  g.strokeStyle = '#000'; g.fillStyle = '#000'; g.lineCap = 'round'; g.lineJoin = 'round'; g.lineWidth = 1.3;
+  g.direction = 'rtl'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  return { eng, g };
+}
+// primitives
+const hline = (g, x0, x1, y, w = 1.3) => { g.lineWidth = w; g.beginPath(); g.moveTo(x0, y); g.lineTo(x1, y); g.stroke(); };
+const circle = (g, x, y, r) => { g.beginPath(); g.arc(x, y, r, 0, TAU); g.stroke(); };
+const dot = (g, x, y, r) => { g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill(); };
+function txt(g, s, x, y, fs, maxW) { g.font = `${fs}px ${AR_FONT}`; g.fillText(s, x, y, maxW); }
+function rrect(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.lineTo(x + w - r, y); g.quadraticCurveTo(x + w, y, x + w, y + r); g.lineTo(x + w, y + h - r); g.quadraticCurveTo(x + w, y + h, x + w - r, y + h); g.lineTo(x + r, y + h); g.quadraticCurveTo(x, y + h, x, y + h - r); g.lineTo(x, y + r); g.quadraticCurveTo(x, y, x + r, y); g.closePath(); g.stroke(); }
+function rosette(g, cx, cy, r) {
+  g.lineWidth = 1.2; circle(g, cx, cy, r); circle(g, cx, cy, r * 0.3); dot(g, cx, cy, r * 0.1);
+  for (let k = 0; k < 8; k++) {
+    const a = k * TAU / 8, ca = Math.cos(a), sa = Math.sin(a), px = -sa, py = ca;
+    const bx = cx + ca * r * 0.3, by = cy + sa * r * 0.3, tx = cx + ca * r * 0.92, ty = cy + sa * r * 0.92, mx = cx + ca * r * 0.6, my = cy + sa * r * 0.6;
+    g.beginPath(); g.moveTo(bx, by); g.quadraticCurveTo(mx + px * r * 0.26, my + py * r * 0.26, tx, ty); g.quadraticCurveTo(mx - px * r * 0.26, my - py * r * 0.26, bx, by); g.stroke();
+  }
+}
+function leaf(g, x, y, len) {
+  const w = Math.abs(len) * 0.5; g.lineWidth = 1.2;
+  g.beginPath(); g.moveTo(x, y); g.bezierCurveTo(x - w, y + len * 0.35, x - w * 0.6, y + len * 0.9, x, y + len); g.bezierCurveTo(x + w * 0.6, y + len * 0.9, x + w, y + len * 0.35, x, y); g.stroke();
+  g.beginPath(); g.moveTo(x, y + len * 0.12); g.lineTo(x, y + len * 0.82); g.stroke();
+  g.beginPath(); g.moveTo(x - w * 0.45, y + len * 0.5); g.quadraticCurveTo(x - w * 1.15, y + len * 0.6, x - w * 0.95, y + len * 0.12);
+  g.moveTo(x + w * 0.45, y + len * 0.5); g.quadraticCurveTo(x + w * 1.15, y + len * 0.6, x + w * 0.95, y + len * 0.12); g.stroke();
+}
+function vine(g, x0, x1, y0, y1) {
+  const h = y1 - y0, cy = (y0 + y1) / 2, amp = h * 0.2, per = h * 2.1;
+  g.lineWidth = 1.4; g.beginPath();
+  for (let x = x0; x <= x1; x += 3) { const y = cy + amp * Math.sin((x - x0) / per * TAU); x === x0 ? g.moveTo(x, y) : g.lineTo(x, y); }
+  g.stroke();
+  for (let x = x0 + per / 4; x < x1 - per / 4; x += per / 2) {
+    const ph = (x - x0) / per * TAU, y = cy + amp * Math.sin(ph), dir = Math.sin(ph) > 0 ? 1 : -1;
+    leaf(g, x, y, h * 0.42 * dir);
+    const tx = x + per / 4, ty = cy + amp * Math.sin(ph + Math.PI / 2), r = h * 0.11;
+    g.beginPath(); g.arc(tx, ty - dir * r, r, Math.PI / 2 * dir, Math.PI / 2 * dir + Math.PI * 1.6 * dir, dir < 0); g.stroke();
+    dot(g, tx + r * 0.6, ty - dir * r * 1.3, 1.1);
+  }
+}
+function rope(g, x0, x1, y0, y1) {
+  const h = y1 - y0, cy = (y0 + y1) / 2, per = h * 2.4; g.lineWidth = 1.2;
+  for (const ph of [0, Math.PI]) {
+    g.beginPath();
+    for (let x = x0; x <= x1; x += 2) { const y = cy + (h / 2) * Math.sin((x - x0) / per * TAU + ph); x === x0 ? g.moveTo(x, y) : g.lineTo(x, y); }
+    g.stroke();
+  }
+}
+function scallops(g, x0, x1, y0, y1) {
+  const r = Math.abs(y1 - y0) / 2, cy = Math.min(y0, y1); g.lineWidth = 1.2; g.beginPath();
+  for (let x = x0; x < x1; x += r * 2) { g.moveTo(x, cy); g.arc(x + r, cy, r, Math.PI, 0, true); }
+  g.stroke();
+}
+function hatch(g, x0, x1, y0, y1) {
+  const h = y1 - y0; g.lineWidth = 1; g.beginPath();
+  for (let x = x0; x < x1; x += h * 0.55) { g.moveTo(x, y1); g.lineTo(x + h * 0.7, y0); g.moveTo(x, y0); g.lineTo(x + h * 0.7, y1); }
+  g.stroke();
+}
+function cartouches(g, x0, x1, y0, y1, labels) {
+  const n = labels.length, cell = (x1 - x0) / n, h = y1 - y0, rr = h * 0.4, cy = (y0 + y1) / 2, fs = h * 0.58, pad = h * 0.2;
+  for (let i = 0; i < n; i++) {
+    const bx = x0 + i * cell; rosette(g, bx, cy, rr); if (i === 0) rosette(g, x1, cy, rr);
+    const tx0 = bx + rr + pad, tx1 = bx + cell - rr - pad;
+    g.lineWidth = 1.1; rrect(g, tx0, y0 + h * 0.08, tx1 - tx0, h * 0.84, h * 0.3);
+    txt(g, labels[i], (tx0 + tx1) / 2, cy + fs * 0.06, fs, tx1 - tx0 - pad);
+  }
+}
+function scale(g, x0, x1, yNum, yTop, yBot, divisions, major, numEvery, fs) {
+  const step = (x1 - x0) / divisions;
+  for (let i = 0; i < divisions; i++) {
+    const x = x0 + i * step, isMajor = i % major === 0;
+    g.lineWidth = isMajor ? 1.4 : 0.9; g.beginPath(); g.moveTo(x, yBot); g.lineTo(x, isMajor ? yTop : yTop + (yBot - yTop) * 0.5); g.stroke();
+    if (numEvery && i % numEvery === 0) txt(g, num(i * 360 / divisions), x + step * numEvery / 2, yNum, fs);
+  }
+}
+
+/* ---------- ring textures (polar strip, y=0 at outer edge) ---------- */
+function ringMaps(rIn, rOut, layout, seed) {
+  const circ = TAU * (rIn + rOut) / 2 * 1000, band = (rOut - rIn) * 1000;
+  const ppu = Math.min(1.6, MAXTEX / circ), W = Math.round(circ * ppu), H = Math.round(band * ppu * 1.4);
+  const { eng, g } = engCtx(W, H, circ, band);
+  layout(g, circ, band, f => f * band);
+  return finishSet(eng, rng(seed));
+}
+const LAYOUTS = {
+  mater: (g, c, b, Y) => { rope(g, 0, c, Y(0.02), Y(0.055)); hline(g, 0, c, Y(0.075)); vine(g, 0, c, Y(0.095), Y(0.30)); hline(g, 0, c, Y(0.32));
+    cartouches(g, 0, c, Y(0.35), Y(0.66), ZODIAC); hline(g, 0, c, Y(0.69)); scale(g, 0, c, Y(0.755), Y(0.82), Y(0.93), 360, 5, 10, Y(0.095)); hline(g, 0, c, Y(0.945)); hline(g, 0, c, Y(0.975)); },
+  ring1: (g, c, b, Y) => { rope(g, 0, c, Y(0.02), Y(0.06)); hline(g, 0, c, Y(0.08)); cartouches(g, 0, c, Y(0.11), Y(0.52), MANSIONS); hline(g, 0, c, Y(0.55)); vine(g, 0, c, Y(0.58), Y(0.91)); hline(g, 0, c, Y(0.935)); hline(g, 0, c, Y(0.97)); },
+  ring2: (g, c, b, Y) => { hline(g, 0, c, Y(0.03)); scale(g, 0, c, Y(0.10), Y(0.17), Y(0.29), 360, 5, 10, Y(0.095)); hline(g, 0, c, Y(0.31)); cartouches(g, 0, c, Y(0.34), Y(0.79), ZODIAC); hline(g, 0, c, Y(0.82)); scallops(g, 0, c, Y(0.85), Y(0.97)); },
+  ring3: (g, c, b, Y) => { rope(g, 0, c, Y(0.015), Y(0.06)); hline(g, 0, c, Y(0.08)); cartouches(g, 0, c, Y(0.11), Y(0.62), MONTHS); hline(g, 0, c, Y(0.65)); vine(g, 0, c, Y(0.68), Y(0.94)); hline(g, 0, c, Y(0.97)); },
+  ring4: (g, c, b, Y) => { hline(g, 0, c, Y(0.03)); cartouches(g, 0, c, Y(0.07), Y(0.62), PLANETS); hline(g, 0, c, Y(0.65)); hatch(g, 0, c, Y(0.69), Y(0.93)); hline(g, 0, c, Y(0.965)); },
+};
+
+/* ---------- globe texture (equirectangular) ---------- */
+function globeMaps(radius) {
+  const cw = TAU * radius * 1000, ch = cw / 2;
+  const W = Math.min(4096, MAXTEX), H = W / 2;
+  const { eng, g } = engCtx(W, H, cw, ch);
+  const X = ra => ra / 360 * cw, Yd = dec => (90 - dec) / 180 * ch;
+  const eps = 23.44 * Math.PI / 180;
+  const drawAll = () => {
+    // graticule
+    for (let ra = 0; ra < 360; ra += 30) { g.lineWidth = 0.7; g.beginPath(); g.moveTo(X(ra), Yd(84)); g.lineTo(X(ra), Yd(-84)); g.stroke(); }
+    for (const d of [60, 30, -30, -60]) hline(g, 0, cw, Yd(d), 0.7);
+    for (const d of [23.44, -23.44]) { g.setLineDash([6, 5]); hline(g, 0, cw, Yd(d), 0.9); g.setLineDash([]); }
+    for (const d of [84, -84]) { hline(g, 0, cw, Yd(d), 1.2); hline(g, 0, cw, Yd(d > 0 ? 80 : -80), 0.8); scallops(g, 0, cw, Yd(d > 0 ? 80 : -80), Yd(d > 0 ? 77 : -77)); }
+    // equator band (torus covers ±2°)
+    const eq = Yd(0);
+    for (const s of [1, -1]) { hline(g, 0, cw, eq - s * 14, 1.3); hline(g, 0, cw, eq - s * 40, 1.3); }
+    scale(g, 0, cw, eq - 30, eq - 24, eq - 16, 360, 5, 10, 13);
+    scale(g, 0, cw, 0, eq + 16, eq + 26, 360, 5, 0, 0);
+    // ecliptic
+    const pt = lam => { const l = lam * Math.PI / 180; const dec = Math.asin(Math.sin(eps) * Math.sin(l)); let ra = Math.atan2(Math.sin(l) * Math.cos(eps), Math.cos(l)); if (ra < 0) ra += TAU; return [X(ra * 180 / Math.PI), Yd(dec * 180 / Math.PI)]; };
+    for (const off of [-7, 7]) { g.lineWidth = 1.3; g.beginPath(); for (let lam = 0; lam <= 360; lam += 1) { const [x, y] = pt(lam); lam === 0 ? g.moveTo(x, y + off) : (Math.abs(x - pt(lam - 1)[0]) > cw / 2 ? g.moveTo(x, y + off) : g.lineTo(x, y + off)); } g.stroke(); }
+    for (let lam = 0; lam < 360; lam += 2) { const [x, y] = pt(lam); const M = lam % 10 === 0; g.lineWidth = M ? 1.3 : 0.8; g.beginPath(); g.moveTo(x, y - 7); g.lineTo(x, y + (M ? 7 : 0)); g.stroke(); }
+    for (let k = 0; k < 12; k++) {
+      const [x0, y0] = pt(k * 30), [x, y] = pt(k * 30 + 15), [x2, y2] = pt(k * 30 + 17);
+      rosette(g, x0, y0, 11);
+      g.save(); g.translate(x, y - 22); g.rotate(Math.atan2(y2 - y, x2 - x)); txt(g, ZODIAC[k], 0, 0, 22); g.restore();
+    }
+    // stars, asterism lines, names
+    g.lineWidth = 0.9; g.beginPath();
+    for (const [a, b] of LINES) { const A = STARS[a], B = STARS[b]; let rb = B[1]; if (A[1] - rb > 180) rb += 360; else if (rb - A[1] > 180) rb -= 360; g.moveTo(X(A[1]), Yd(A[2])); g.lineTo(X(rb), Yd(B[2])); }
+    g.stroke();
+    for (const [name, ra, dec, mag] of STARS) {
+      const x = X(ra), y = Yd(dec), r = Math.max(3.5, Math.min(11, 4.5 + (2.2 - mag) * 2.2));
+      g.beginPath(); for (let k = 0; k < 12; k++) { const a = k * TAU / 12 - Math.PI / 2, rr = k % 2 ? r * 0.42 : r; g.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); } g.closePath(); g.fill();
+      if (name && Math.abs(dec) < 66) txt(g, name, x, y + r + 12, 17);
+    }
+    for (const [name, ra, dec] of GROUPS) { g.lineWidth = 1; const w = name.length * 12 + 20; rrect(g, X(ra) - w / 2, Yd(dec) - 14, w, 28, 8); txt(g, name, X(ra), Yd(dec) + 1, 19, w - 10); }
+  };
+  for (const off of [-cw, 0, cw]) { g.save(); g.translate(off, 0); drawAll(); g.restore(); }
+  return finishSet(eng, rng(7), [C.globe, C.globeHi, C.globeLo]);
+}
+function bandMaps(R, tube) {
+  const cw = TAU * R * 1000, ch = TAU * tube * 1000, W = Math.min(4096, MAXTEX), H = Math.max(32, Math.round(W * ch / cw));
+  const { eng, g } = engCtx(W, H, cw, ch);
+  for (let i = 0; i < 360; i++) { const x = i / 360 * cw, M = i % 10 === 0, m = i % 5 === 0; g.lineWidth = M ? 1.6 : 1; g.beginPath(); g.moveTo(x, ch * (M ? 0.05 : m ? 0.25 : 0.38)); g.lineTo(x, ch * (M ? 0.95 : m ? 0.75 : 0.62)); g.stroke(); }
+  hline(g, 0, cw, ch * 0.5, 0.8);
+  return finishSet(eng, rng(11));
+}
+/* ---------- throne (kursi) outline + planar texture ---------- */
+function thronePts() {
+  const side = []; const n = 44;
+  for (let i = 0; i <= n; i++) { const s = i / n; const y = 0.80 + 0.62 * s; const w = 0.06 + 0.41 * Math.pow(1 - s, 0.55) * (1 + 0.06 * Math.sin(s * Math.PI * 8)); side.push([w, y]); }
+  const pts = [];
+  for (let i = 0; i <= n; i++) pts.push(side[i]);
+  for (let i = n; i >= 0; i--) pts.push([-side[i][0], side[i][1]]);
+  const a0 = Math.atan2(0.80, -0.47), a1 = Math.atan2(0.80, 0.47);
+  for (let i = 1; i < 16; i++) { const a = a0 + (a1 - a0) * i / 16; pts.push([0.93 * Math.cos(a), 0.93 * Math.sin(a)]); }
+  return pts;
+}
+function throneMaps(pts) {
+  const W = Math.min(1536, MAXTEX), H = W; // covers x ∈ [-0.5,0.5], y ∈ [0.9,1.9] world units, 1000 mm each
+  const { eng, g } = engCtx(W, H, 1000, 1000);
+  const P = ([x, y]) => [(x + 0.5) * 1000, (1.9 - y) * 1000];
+  const cx = 0, cy = 1.12;
+  const outline = (k) => { g.beginPath(); pts.forEach(([x, y], i) => { const [px, py] = P([cx + (x - cx) * k, cy + (y - cy) * k]); i ? g.lineTo(px, py) : g.moveTo(px, py); }); g.closePath(); };
+  g.lineWidth = 1.6; outline(0.9); g.stroke(); g.lineWidth = 1.1; outline(0.82); g.stroke();
+  g.save(); outline(0.82); g.clip();
+  for (let row = 0; row < 12; row++) for (let col = -6; col < 7; col++) {
+    const x = 500 + col * 84 + (row % 2) * 42, y = 40 + row * 84; leaf(g, x, y, 34); leaf(g, x, y + 68, -34); g.lineWidth = 1; circle(g, x + 42, y + 34, 9);
+  }
+  g.restore();
+  const [tx, ty] = P([0, 1.19]);
+  g.globalCompositeOperation = 'destination-out'; g.beginPath(); g.ellipse(tx, ty, 118, 70, 0, 0, TAU); g.fill(); g.globalCompositeOperation = 'source-over';
+  g.lineWidth = 1.8; g.beginPath(); g.ellipse(tx, ty, 118, 70, 0, 0, TAU); g.stroke(); g.lineWidth = 1.1; g.beginPath(); g.ellipse(tx, ty, 108, 61, 0, 0, TAU); g.stroke();
+  txt(g, 'بسم الله الرحمن الرحيم', tx, ty - 18, 30, 200); txt(g, 'أسطرلاب كروي', tx, ty + 24, 26, 180);
+  rosette(g, tx, ty - 95, 22);
+  return finishSet(eng, rng(5));
+}
+
+/* ---------- geometry ---------- */
+function annulus(rIn, rOut, h, seg = 256) {
+  const pos = [], nor = [], uv = [], idx = []; let vi = 0;
+  const push = (x, y, z, nx, ny, nz, u, v) => { pos.push(x, y, z); nor.push(nx, ny, nz); uv.push(u, v); return vi++; };
+  const top = [], bot = [], ow = [], iw = [];
+  for (let i = 0; i <= seg; i++) {
+    const t = i / seg * TAU, c = Math.cos(t), s = Math.sin(t), f = i / seg;
+    top.push([push(rIn * c, rIn * s, h / 2, 0, 0, 1, 1 - f, 0), push(rOut * c, rOut * s, h / 2, 0, 0, 1, 1 - f, 1)]);
+    bot.push([push(rIn * c, rIn * s, -h / 2, 0, 0, -1, f, 0), push(rOut * c, rOut * s, -h / 2, 0, 0, -1, f, 1)]);
+    ow.push([push(rOut * c, rOut * s, -h / 2, c, s, 0, f, 0), push(rOut * c, rOut * s, h / 2, c, s, 0, f, 1)]);
+    iw.push([push(rIn * c, rIn * s, -h / 2, -c, -s, 0, f, 0), push(rIn * c, rIn * s, h / 2, -c, -s, 0, f, 1)]);
+  }
+  for (let i = 0; i < seg; i++) { const [a, b] = top[i], [c, d] = top[i + 1]; idx.push(a, b, d, a, d, c); const [e, f] = bot[i], [g2, k] = bot[i + 1]; idx.push(e, k, f, e, g2, k); }
+  const faces = idx.length;
+  for (let i = 0; i < seg; i++) { const [lo, hi] = ow[i], [lo1, hi1] = ow[i + 1]; idx.push(lo, lo1, hi1, lo, hi1, hi); const [a, b] = iw[i], [a1, b1] = iw[i + 1]; idx.push(a, b1, a1, a, b, b1); }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  geo.setIndex(idx); geo.addGroup(0, faces, 0); geo.addGroup(faces, idx.length - faces, 1);
+  return geo;
+}
+
+/* ---------- boot ---------- */
+if (!document.createElement('canvas').getContext('webgl2')) {
+  fail('This model needs WebGL2. Open the page in a current desktop or mobile browser with hardware acceleration enabled.');
+} else {
+  setTimeout(boot, 40);
+}
+
+function boot() {
+  const canvas = $('#gl');
+  let renderer;
+  try { renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'high-performance' }); }
+  catch (e) { fail('The GPU context could not be created. ' + e.message); return; }
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
+  renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  MAXTEX = renderer.capabilities.maxTextureSize; ANISO = renderer.capabilities.getMaxAnisotropy();
+
+  const scene = new THREE.Scene();
+  const bg = new THREE.Color(oklch(0.17, 0.012, 60));
+  scene.background = bg; scene.fog = new THREE.Fog(bg, 6, 13);
+  const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 40);
+  const target = new THREE.Vector3(0, 0.18, 0);
+  const camDir = new THREE.Vector3(0.42, 0.26, 0.87).normalize();
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture; pmrem.dispose();
+  scene.environmentIntensity = 0.65;
+
+  const controls = new OrbitControls(camera, canvas);
+  controls.target.copy(target); controls.enableDamping = true; controls.dampingFactor = 0.08;
+  controls.minDistance = 1.6; controls.maxDistance = 8; controls.maxPolarAngle = Math.PI * 0.62; controls.enablePan = false;
+
+  // lights + studio
+  const key = new THREE.DirectionalLight(new THREE.Color(oklch(0.98, 0.02, 80)), 2.4); key.position.set(2.6, 3.2, 3.6); key.castShadow = true;
+  key.shadow.mapSize.set(2048, 2048); key.shadow.camera.left = key.shadow.camera.bottom = -2.4; key.shadow.camera.right = key.shadow.camera.top = 2.4; key.shadow.camera.near = 0.5; key.shadow.camera.far = 12; key.shadow.bias = -0.0004; key.shadow.normalBias = 0.02; key.shadow.radius = 4;
+  const fill = new THREE.DirectionalLight(new THREE.Color(oklch(0.9, 0.03, 220)), 0.5); fill.position.set(-3, 0.6, 2.2);
+  const rim = new THREE.DirectionalLight(new THREE.Color(oklch(0.95, 0.04, 70)), 0.9); rim.position.set(0.5, 1.6, -3);
+  const hemi = new THREE.HemisphereLight(new THREE.Color(oklch(0.6, 0.02, 220)), new THREE.Color(oklch(0.3, 0.03, 60)), 0.35);
+  scene.add(key, fill, rim, hemi);
+  const studio = new THREE.MeshStandardMaterial({ color: new THREE.Color(oklch(0.25, 0.014, 60)), roughness: 0.96, metalness: 0 });
+  const wall = new THREE.Mesh(new THREE.PlaneGeometry(16, 12), studio); wall.position.set(0, 0.5, -1.45); wall.receiveShadow = true;
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(16, 16), studio); floor.rotation.x = -Math.PI / 2; floor.position.y = -2.1; floor.receiveShadow = true;
+  scene.add(wall, floor);
+
+  // materials
+  const mkTex = (cnv, srgb) => { const t = new THREE.CanvasTexture(cnv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = ANISO; if (srgb) t.colorSpace = THREE.SRGBColorSpace; return t; };
+  const faceMat = (set, bumpScale = 0.0035) => new THREE.MeshStandardMaterial({
+    map: mkTex(set.col, true), bumpMap: mkTex(set.bump, false), bumpScale, roughnessMap: mkTex(set.rm, false), metalnessMap: mkTex(set.rm, false),
+    roughness: 1, metalness: 1, envMapIntensity: 1.1, emissive: new THREE.Color(oklch(0.72, 0.10, 85)), emissiveIntensity: 0,
+  });
+  const brass = new THREE.MeshStandardMaterial({ color: new THREE.Color(oklch(0.64, 0.10, 84)), roughness: 0.42, metalness: 1 });
+  const iron = new THREE.MeshStandardMaterial({ color: new THREE.Color(oklch(0.34, 0.012, 60)), roughness: 0.55, metalness: 0.9 });
+
+  const astro = new THREE.Group(); scene.add(astro);
+  const pickables = [], parts = [];
+  const addMesh = (geo, mat, parent, pick) => { const m = new THREE.Mesh(geo, mat); m.castShadow = m.receiveShadow = true; parent.add(m); if (pick) { m.userData.part = pick; pickables.push(m); } return m; };
+  const knob = (x, r, len, parent, part) => { const m = addMesh(new THREE.CylinderGeometry(r, r, len, 24), brass, parent, part); m.rotation.z = Math.PI / 2; m.position.x = x; return m; };
+
+  // mater (fixed) + throne + suspension ring + cord
+  const MATER = { rIn: 0.87, rOut: 1.0, h: 0.03 };
+  addMesh(annulus(MATER.rIn, MATER.rOut, MATER.h, 320), [faceMat(ringMaps(MATER.rIn, MATER.rOut, LAYOUTS.mater, 1)), brass], astro, null);
+  const tp = thronePts(); const shape = new THREE.Shape(tp.map(p => new THREE.Vector2(p[0], p[1])));
+  const throneGeo = new THREE.ExtrudeGeometry(shape, { depth: MATER.h * 0.94, bevelEnabled: false }); throneGeo.translate(0, 0, -MATER.h * 0.47);
+  const throneMat = faceMat(throneMaps(tp), 0.003);
+  for (const t of [throneMat.map, throneMat.bumpMap, throneMat.roughnessMap, throneMat.metalnessMap]) { t.offset.set(0.5, -0.9); }
+  addMesh(throneGeo, [throneMat, brass], astro, null);
+  const halqa = addMesh(new THREE.TorusGeometry(0.075, 0.012, 16, 48), brass, astro, null); halqa.position.set(0, 1.485, 0);
+  const cord = addMesh(new THREE.CylinderGeometry(0.004, 0.004, 3.2, 8), iron, astro, null); cord.position.set(0, 1.545 + 1.6, 0);
+  // axle
+  const axle = addMesh(new THREE.BoxGeometry(1.98, 0.026, 0.018), iron, astro, null); axle.castShadow = true;
+
+  // rings
+  const RINGS = [
+    { name: 'Ring I', ar: 'الحلقة الأولى', rIn: 0.74, rOut: 0.845, h: 0.028, layout: LAYOUTS.ring1, seed: 2, a0: 14 },
+    { name: 'Ring II', ar: 'الحلقة الثانية', rIn: 0.615, rOut: 0.715, h: 0.026, layout: LAYOUTS.ring2, seed: 3, a0: -24 },
+    { name: 'Ring III', ar: 'الحلقة الثالثة', rIn: 0.515, rOut: 0.59, h: 0.024, layout: LAYOUTS.ring3, seed: 4, a0: 32 },
+    { name: 'Ring IV', ar: 'الحلقة الرابعة', rIn: 0.425, rOut: 0.49, h: 0.022, layout: LAYOUTS.ring4, seed: 6, a0: -42 },
+  ];
+  let prevIn = MATER.rIn;
+  for (const r of RINGS) {
+    const group = new THREE.Group(); astro.add(group);
+    const part = { name: r.name, ar: r.ar, group, angle: 0, mat: faceMat(ringMaps(r.rIn, r.rOut, r.layout, r.seed)) };
+    addMesh(annulus(r.rIn, r.rOut, r.h, 256), [part.mat, brass], group, part);
+    const gap = prevIn - r.rOut, kx = r.rOut + gap / 2;
+    knob(kx, 0.021, gap + 0.004, group, part); knob(-kx, 0.016, gap + 0.004, group, part);
+    prevIn = r.rIn; parts.push(part); part.a0 = r.a0;
+  }
+  // globe
+  const GR = 0.36;
+  const gGroup = new THREE.Group(); astro.add(gGroup);
+  const globePart = { name: 'Globe', ar: 'الكرة', group: gGroup, angle: 0, mat: faceMat(globeMaps(GR), 0.003), a0: 12 };
+  const sphere = addMesh(new THREE.SphereGeometry(GR, 160, 96), globePart.mat, gGroup, globePart); sphere.rotation.z = -Math.PI / 2;
+  const band = addMesh(new THREE.TorusGeometry(GR + 0.004, 0.012, 20, 240), faceMat(bandMaps(GR + 0.004, 0.012), 0.002), gGroup, globePart); band.rotation.y = Math.PI / 2;
+  knob(GR + 0.02, 0.03, 0.05, gGroup, globePart); knob(-(GR + 0.02), 0.03, 0.05, gGroup, globePart);
+  parts.push(globePart);
+
+  /* ---------- UI rows ---------- */
+  const rows = $('#rows'); const rowEls = new Map();
+  const deg = a => { let d = Math.round(a * 180 / Math.PI) % 360; if (d > 180) d -= 360; if (d <= -180) d += 360; return d; };
+  for (const p of parts) {
+    const id = p.name.toLowerCase().replace(/\s+/g, '-');
+    const row = document.createElement('div'); row.className = 'row'; row.dataset.odId = 'row-' + id;
+    row.innerHTML = `<label class="name" for="s-${id}">${p.name}<span class="ar">${p.ar}</span></label><span class="val" id="v-${id}">0°</span><input type="range" id="s-${id}" min="-180" max="180" step="1" value="0" aria-label="${p.name} tilt in degrees">`;
+    rows.appendChild(row);
+    const slider = row.querySelector('input'), val = row.querySelector('.val');
+    slider.addEventListener('input', () => setAngle(p, slider.value * Math.PI / 180, false));
+    slider.addEventListener('change', save);
+    row.addEventListener('pointerenter', () => setHot(p)); row.addEventListener('pointerleave', () => { if (!drag) setHot(null); });
+    rowEls.set(p, { row, slider, val });
+  }
+  function setAngle(p, a, sync = true) {
+    p.angle = a; p.group.rotation.x = a;
+    const el = rowEls.get(p); el.val.textContent = deg(a) + '°'; if (sync) el.slider.value = deg(a);
+  }
+  let hot = null, drag = null;
+  function setHot(p) {
+    if (hot === p) return;
+    if (hot) { hot.mat.emissiveIntensity = 0; const e = rowEls.get(hot); e.row.classList.remove('is-hot'); e.val.classList.remove('is-hot'); }
+    hot = p;
+    if (hot) { hot.mat.emissiveIntensity = 0.14; const e = rowEls.get(hot); e.row.classList.add('is-hot'); e.val.classList.add('is-hot'); }
+  }
+  const STORE = 'islamic-astrolabe-pose';
+  function save() { try { localStorage.setItem(STORE, JSON.stringify(parts.map(p => p.angle))); } catch (e) { /* storage unavailable */ } }
+  (function restore() {
+    let saved = null; try { saved = JSON.parse(localStorage.getItem(STORE) || 'null'); } catch (e) { saved = null; }
+    parts.forEach((p, i) => setAngle(p, saved && typeof saved[i] === 'number' ? saved[i] : p.a0 * Math.PI / 180));
+  })();
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  $('#reset').addEventListener('click', () => {
+    const from = parts.map(p => p.angle), t0 = performance.now(), D = reduced ? 0 : 420;
+    const step = now => {
+      const k = D ? Math.min(1, (now - t0) / D) : 1, e = 1 - Math.pow(1 - k, 3);
+      parts.forEach((p, i) => setAngle(p, from[i] * (1 - e)));
+      if (k < 1) requestAnimationFrame(step); else save();
+    };
+    requestAnimationFrame(step);
+    $('#status').textContent = 'Pose reset';
+    setTimeout(() => { $('#status').textContent = ''; }, 1800);
+  });
+
+  /* ---------- drag rings in scene ---------- */
+  const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+  const pick = e => { const r = canvas.getBoundingClientRect(); ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1); ray.setFromCamera(ndc, camera); return ray.intersectObjects(pickables, false)[0] || null; };
+  const toScreen = p => { const q = p.clone().project(camera); return { x: (q.x + 1) / 2 * canvas.clientWidth, y: (1 - q.y) / 2 * canvas.clientHeight }; };
+  canvas.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    const h = pick(e); if (!h) return;
+    const part = h.object.userData.part;
+    drag = { part, local: part.group.worldToLocal(h.point.clone()), x: e.clientX, y: e.clientY };
+    controls.enabled = false; canvas.setPointerCapture(e.pointerId); canvas.style.cursor = 'grabbing'; setHot(part);
+  }, { capture: true });
+  canvas.addEventListener('pointermove', e => {
+    if (drag) {
+      const p = drag.part.group.localToWorld(drag.local.clone());
+      const v = new THREE.Vector3(1, 0, 0).cross(p);
+      const s0 = toScreen(p), s1 = toScreen(p.clone().addScaledVector(v, 0.05));
+      const dx = (s1.x - s0.x) / 0.05, dy = (s1.y - s0.y) / 0.05;
+      const mdx = e.clientX - drag.x, mdy = e.clientY - drag.y; drag.x = e.clientX; drag.y = e.clientY;
+      const L2 = Math.max(dx * dx + dy * dy, 40 * 40);
+      setAngle(drag.part, drag.part.angle + (mdx * dx + mdy * dy) / L2);
+    } else {
+      const h = pick(e); setHot(h ? h.object.userData.part : null); canvas.style.cursor = h ? 'grab' : '';
+    }
+  });
+  const endDrag = e => { if (!drag) return; try { canvas.releasePointerCapture(e.pointerId); } catch (err) { /* already released */ } drag = null; controls.enabled = true; canvas.style.cursor = 'grab'; save(); };
+  canvas.addEventListener('pointerup', endDrag); canvas.addEventListener('pointercancel', endDrag);
+
+  /* ---------- resize + loop ---------- */
+  function resize() {
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    if (canvas.width !== Math.floor(w * renderer.getPixelRatio()) || canvas.height !== Math.floor(h * renderer.getPixelRatio())) renderer.setSize(w, h, false);
+    camera.aspect = w / h; camera.updateProjectionMatrix();
+    const dist = 4.3 / Math.min(1, camera.aspect / 0.95);
+    controls.minDistance = Math.min(controls.minDistance, dist); controls.maxDistance = Math.max(8, dist * 1.4);
+    if (!resize.done) { camera.position.copy(target).addScaledVector(camDir, dist); resize.done = true; }
+  }
+  window.addEventListener('resize', resize); resize();
+
+  let frames = 0, acc = 0, last = performance.now(), first = true;
+  function tick(now) {
+    resize(); controls.update(); renderer.render(scene, camera);
+    if (first) { first = false; const err = renderer.getContext().getError(); if (err) console.warn('WebGL error after first frame:', err); }
+    frames++; acc += now - last; last = now;
+    if (acc > 500) { badge.textContent = 'GPU · WebGL2 · ' + Math.round(frames * 1000 / acc) + ' fps'; frames = 0; acc = 0; }
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+</script>
+<script>
+  window.addEventListener('error', e => { if (!window.__astroBooted) { const f = document.getElementById('fallback'); f.querySelector('p').textContent = 'The 3D engine could not be loaded: ' + e.message; f.classList.add('show'); } });
+  setTimeout(() => { if (!window.__astroBooted) { const f = document.getElementById('fallback'); f.querySelector('p').textContent = 'The 3D engine did not start. Serve this folder over HTTP so the module scripts in vendor/ can load.'; f.classList.add('show'); } }, 6000);
+</script>
+</body>
+</html>
